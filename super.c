@@ -83,101 +83,9 @@ static void destroy_inode_cache(void)
 
 
 
-struct inode *sfs_iget (struct super_block *sb, unsigned long ino);
 
-static inline void sfs_put_page(struct page *page)
-{
-	kunmap(page);
-	put_page(page);
-}
 
-static struct dentry *sfs_lookup(struct inode * dir, struct dentry *dentry, unsigned int flags)
-{
-	struct inode * inode;
-	ino_t ino;
 
-// struct sfs_dir_entry *ext2_find_entry(struct inode *dir, const struct qstr *child, struct page **res_page) {	
-	struct sfs_inode_info *si;
-	const char *name = dentry->d_name.name;
-	unsigned long start = si->i_dir_start_lookup;
-	struct sfs_dentry_block *raw_dentry;
-	struct sfs_dir_entry *entry;
-
-	// static struct page* sfs_get_page(struct inode *dir, unsigned long n, int quiet) {
-	struct address_space *mapping = dir->i_mapping;
-	struct page *page = read_mapping_page(mapping, start, NULL);
-
-	if(!IS_ERR(page)) {
-		kmap(page);
-		if (unlikely(!PageChecked(page))) {
-			if (PageError(page))// || !sfs_check_page(page, quiet))
-				sfs_put_page(page);
-				return 0;
-		}
-	}
-	// }
-
-	raw_dentry = (struct sfs_dentry_block *)page;
-	entry = raw_dentry->dentry;
-	do {
-		if(!memcmp(name, entry->filename, dentry->d_name.len)) {
-			ino = le32_to_cpu(entry->i_no);
-			break;
-		}
-		sfs_msg(dir->i_sb, KERN_ERR, "finding inode entry : %lu", le32_to_cpu(entry->i_addr));
-		entry = entry + 16; //reclen in sfs
-	} while (8);	//modify later TnT
-//	} while (entry > raw_dentry + 2048);	//modify later TnT
-	
-// }
-	inode = NULL;
-	if (ino) {
-		inode = sfs_iget(dir->i_sb, ino);
-		if (inode == ERR_PTR(-ESTALE)) {
-			sfs_msg(dir->i_sb, KERN_ERR, "unknow inode reference");
-			return ERR_PTR(-EIO);
-		}
-	}
-	return d_splice_alias(inode, dentry);
-}
-
-int sfs_getattr(const struct path *path, struct kstat *stat, u32 request_mask, unsigned int query_falgs)
-{
-	struct inode *inode = d_inode(path->dentry);
-	struct sfs_inode_info *si = SFS_I(inode);
-	unsigned int flags;
-
-	stat->attributes_mask |= (STATX_ATTR_APPEND |
-		STATX_ATTR_COMPRESSED |
-		STATX_ATTR_ENCRYPTED |
-		STATX_ATTR_IMMUTABLE |
-		STATX_ATTR_NODUMP);
-
-	generic_fillattr(inode, stat);
-	return 0;
-}
-
-int sfs_setattr(struct dentry *dentry, struct iattr *iattr)
-{
-	struct inode *inode = d_inode(dentry);
-	int error;
-
-	error = setattr_prepare(dentry, iattr);
-	if (error)
-		return error;
-	if (is_quota_modification(inode, iattr)) {
-		error = dquot_initialize(inode);
-		if (error)
-			return error;
-	}
-
-//need something here
-
-	setattr_copy(inode, iattr);
-	mark_inode_dirty(inode);
-
-	return error;
-}
 
 struct inode_operations sfs_dir_inode_operations = {
 /*
@@ -213,10 +121,14 @@ struct inode_operations sfs_dir_inode_operations = {
 
 
 
+
+
+
+
 struct file_operations sfs_dir_operations = {
+/*
         .llseek         = generic_file_llseek,
         .read           = generic_read_dir,
-/*
 	.iterate_shared = sfs_readdir,
 	.unlocked_ioctl = sfs_ioctl,
 #ifdef CONFIG_COMPAT
@@ -226,64 +138,11 @@ struct file_operations sfs_dir_operations = {
 */	
 };
 
-struct inode *sfs_iget (struct super_block *sb, unsigned long ino) 
-{
-	struct sfs_inode_info *si;
-	struct buffer_head *bh;
-	struct sfs_inode *raw_inode;
-	struct inode *inode;
-	int n;
-	uid_t i_uid;
-	gid_t i_gid;
 
 
-	unsigned long offset;
-	unsigned long block;
 
-	inode = iget_locked(sb, ino);		
 
-	si = SFS_I(inode);
-	inode->i_sb = sb;
 
-	//sfs_get_inode {
-	offset = (ino - SFS_ROOT_INO);
-	block = SFS_GET_SB(sb, inodes_blkaddr) + offset;
-	if (!(bh = sb_bread(sb, block))) {
-		sfs_msg(sb, KERN_ERR, "unable to read inode inode");
-		return 0;
-	}
-	raw_inode = (struct sfs_inode *)bh->b_data;
-	// }
-	
-	inode->i_mode = le16_to_cpu(raw_inode->i_mode);
-	i_uid = (uid_t)le16_to_cpu(raw_inode->i_uid);
-	i_gid = (gid_t)le16_to_cpu(raw_inode->i_gid);
-	i_uid_write(inode, i_uid);
-	i_gid_write(inode, i_gid);
-	set_nlink(inode, le16_to_cpu(raw_inode->i_links));
-	inode->i_size = le32_to_cpu(raw_inode->i_size);
-	inode->i_atime.tv_sec = (signed)le32_to_cpu(raw_inode->i_atime);
-	inode->i_ctime.tv_sec = (signed)le32_to_cpu(raw_inode->i_ctime);
-	inode->i_mtime.tv_sec = (signed)le32_to_cpu(raw_inode->i_mtime);
-	inode->i_atime.tv_nsec = inode->i_mtime.tv_nsec = inode->i_ctime.tv_nsec = 0;
-	inode->i_blocks = le32_to_cpu(raw_inode->i_blocks);
-
-	si->i_dir_start_lookup = 0;
-	for (n = 0; n < DEF_ADDRS_PER_INODE; n++)
-		si->i_data[n] = raw_inode->d_addr[n];
-	for (n; n < DEF_ADDRS_PER_BLOCK; n++)
-		si->i_data[n] = raw_inode->i_addr[n];
-	
-
-	if (S_ISREG(inode->i_mode)) {
-
-	} else if (S_ISDIR(inode->i_mode)) {
-		inode->i_op = &sfs_dir_inode_operations;
-		inode->i_fop = &sfs_dir_operations;
-	} else {
-
-	}	
-}
 
 
 
@@ -314,6 +173,8 @@ const struct file_operations sfs_file_operations = {
 	.splice_write	= iter_file_splice_write,
 */	
 };
+
+
 
 
 
@@ -441,8 +302,8 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 	si->i_dir_start_lookup = 0;
 	for (n = 0; n < DEF_ADDRS_PER_INODE; n++)
 		si->i_data[n] = raw_inode->d_addr[n];
-	for (n; n < DEF_ADDRS_PER_BLOCK; n++)
-		si->i_data[n] = raw_inode->i_addr[n];
+	for (; n < DEF_SFS_N_BLOCKS; n++)
+		si->i_data[n] = raw_inode->i_addr[n - DEF_ADDRS_PER_BLOCK];
 	
 
 	if (S_ISREG(root->i_mode)) {

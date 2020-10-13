@@ -105,8 +105,8 @@ struct sfs_super_block {
 } __attribute__((packed));
 
 #define DEF_ADDRS_PER_INODE     12      /* Address Pointers in Inode */
-#define DEF_NIDS_PER_INODE      3       /* Indirect Pointers in Inode */
-#define DEF_SFS_N_BLOCKS	DEF_ADDRS_PER_INODE + DEF_NIDS_PER_INODE
+#define DEF_IDPS_PER_INODE      3       /* Indirect Pointers in Inode */
+#define DEF_SFS_N_BLOCKS	DEF_ADDRS_PER_INODE + DEF_IDPS_PER_INODE
 #define DEF_ADDRS_PER_BLOCK     1024    /* Address Pointers in a Indirect Block */
 
 #define SFS_NAME_LEN		8
@@ -132,7 +132,7 @@ struct sfs_inode {
         __u8 i_name[SFS_NAME_LEN];      /* file name for SPOR */
 
         __le32 d_addr[DEF_ADDRS_PER_INODE];     /* Pointers to data blocks */
-        __le32 i_addr[DEF_NIDS_PER_INODE];      /* indirect, double indirect,
+        __le32 i_addr[DEF_IDPS_PER_INODE];      /* indirect, double indirect,
                                                 triple_indirect block address*/
 } __attribute__((packed));
 
