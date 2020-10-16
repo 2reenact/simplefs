@@ -126,9 +126,9 @@ struct inode_operations sfs_dir_inode_operations = {
 
 
 struct file_operations sfs_dir_operations = {
-/*
         .llseek         = generic_file_llseek,
         .read           = generic_read_dir,
+/*
 	.iterate_shared = sfs_readdir,
 	.unlocked_ioctl = sfs_ioctl,
 #ifdef CONFIG_COMPAT
@@ -162,14 +162,16 @@ const struct file_operations sfs_file_operations = {
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= sfs_compat_ioctl,
 #endif
-	.mmap		= generic_file_mmap,
-	.open		= dquot_file_open,
 */
+	.mmap		= generic_file_mmap,
 /*
+	.open		= dquot_file_open,
 	.release	= sfs_release_file,
 	.fsync		= sfs_fsync,
 	.get_unmapped_area = thp_get_unmapped_area,
+*/	
 	.splice_read	= generic_file_splice_read,
+/*
 	.splice_write	= iter_file_splice_write,
 */	
 };
