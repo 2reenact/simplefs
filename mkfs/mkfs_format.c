@@ -361,7 +361,7 @@ int sfs_format_device(void)
 {
         int err = 0;
 
-        err= sfs_prepare_super_block();
+        err = sfs_prepare_super_block();
         if (err < 0) {
                 MSG(0, "\tError: Failed to prepare a super block!!!\n");
                 goto exit;
