@@ -272,6 +272,7 @@ struct sfs_super_block {
 #define DEF_ADDRS_PER_BLOCK     1024    /* Address Pointers in a Indirect Block */
 
 #define SFS_NAME_LEN		8
+#define SFS_NAME_LEN_BITS	3
 
 struct sfs_inode {
         __le16 i_mode;                  /* file mode */
@@ -302,10 +303,6 @@ struct indirect_node {
         __le32 addr[DEF_ADDRS_PER_BLOCK];       /* array of data block address */
 } __attribute__((packed));
 
-/* One directory entry slot covers 8byte-long file name */
-#define SFS_SLOT_LEN		8
-#define SFS_SLOT_LEN_BITS	3
-
 /* the number of dentry in a block */
 #define DENTRY_IN_BLOCK		256
 
@@ -319,9 +316,9 @@ struct indirect_node {
 
 struct sfs_dir_entry {
         __le16 file_type;               /* file type */
-        __le16 name_len;                /* length of file name */
+        __le32 i_no;			/* inode number */
         __le32 i_addr;                  /* inode address */
-        __u8 filename[SFS_SLOT_LEN];    /* file name */
+        __u8 filename[SFS_NAME_LEN];    /* file name */
 } __attribute__((packed));
 
 /* 4KB-sized directory entry block */

@@ -155,12 +155,10 @@ static int sfs_add_default_dentry_root(void)
 //modify later !!! name_len should be inode number	
 	dent_blk->dentry[0].file_type = SFS_DIR;
 	dent_blk->dentry[0].i_addr = sb->root_addr;
-	dent_blk->dentry[0].name_len = cpu_to_le16(2);
 	memcpy(dent_blk->dentry[0].filename, ".", 1);
 
 	dent_blk->dentry[1].file_type = SFS_DIR;
 	dent_blk->dentry[1].i_addr = sb->root_addr;
-	dent_blk->dentry[1].name_len = cpu_to_le16(2);
 	memcpy(dent_blk->dentry[1].filename, "..", 2);
 
 	test_and_set_bit_le(0, dent_blk->dentry_bitmap);

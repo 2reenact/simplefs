@@ -28,6 +28,10 @@
 //#include <linux/sfs_fs.h>
 #include "sfs.h"
 
+struct inode *sfs_iget(struct super_block *sb, unsigned long ino);
+
+
+
 void sfs_msg(struct super_block *sb, const char *level, const char *fmt, ...)
 {
 	struct va_format vaf;
@@ -68,7 +72,6 @@ static void destroy_inode_cache(void)
 	 * Make sure all delayed rcu free inodes are flushed before we
 	 * destroy cache.
 	 */
-	rcu_barrier();
 	kmem_cache_destroy(sfs_inode_cachep);
 }
 
@@ -78,20 +81,206 @@ static void destroy_inode_cache(void)
 
 
 
+static inline void sfs_put_page(struct page *page)
+{
+	kunmap(page);
+	put_page(page);
+}
+
+static struct page *sfs_get_page(struct inode *dir, unsigned long n)
+{
+	struct address_space *mapping = dir->i_mapping;
+	struct page *page = read_mapping_page(mapping, n, NULL);
+	if (!IS_ERR(page)) {
+		kmap(page);
+		if (unlikely(!PageChecked(page))) {
+			if (PageError(page))// || !sfs_check_page(page))
+				goto fail;
+		}
+	}
+	return page;
+
+fail:
+	sfs_put_page(page);
+	return ERR_PTR(-EIO);
+}
+
+static int sfs_get_block(struct inode *inode, sector_t iblock,
+		struct buffer_head *bh_result, int create)
+{
+	unsigned max_blocks;
+
+	return 0;
+}
+
+static int sfs_writepage(struct page *page, struct writeback_control *wbc)
+{
+	return block_write_full_page(page, sfs_get_block, wbc);
+}
+
+static int sfs_readpage(struct file *file, struct page *page)
+{
+	return block_read_full_page(page, sfs_get_block);
+}
+
+#if 0
+int sfs_prepare_chunk(struct page *page, loff_t pos, unsigned len)
+{
+		return __block_write_begin(page, pos, len, sfs_get_block);
+}
+#endif
+
+static void sfs_truncate_blocks(struct inode *);
+
+static void sfs_write_failed(struct address_space *mapping, loff_t to)
+{
+	struct inode *inode = mapping->host;
+
+	if (to > inode->i_size) {
+		truncate_pagecache(inode, inode->i_size);
+		sfs_truncate_blocks(inode);
+	}
+}
+
+static int sfs_write_begin(struct file *file, struct address_space *mapping,
+		loff_t pos, unsigned len, unsigned flags,
+		struct page **pagep, void **fsdata)
+{
+	int ret;
+
+	ret = block_write_begin(mapping, pos, len, flags, pagep,
+			sfs_get_block);
+	if (unlikely(ret))
+		sfs_write_failed(mapping, pos + len);
+
+	return ret;
+}
+
+static int sfs_write_end(struct file *file, struct address_space *mapping,
+		loff_t pos, unsigned len, unsigned copied,
+		struct page *page, void *fsdata)
+{
+	int ret;
+
+	ret = generic_write_end(file, mapping, pos, len, copied, page, fsdata);
+	if (ret < len)
+		sfs_write_failed(mapping, pos + len);
+	return ret;
+}
+
+const struct address_space_operations sfs_aops = {
+	.readpage	= sfs_readpage,
+/*
+	.writepage	= sfs_writepage,
+	.write_begin	= sfs_write_begin,
+	.write_end	= sfs_write_end,
+	.bmap		= sfs_bmap,
+*/
+};
 
 
 
 
 
 
+
+static unsigned sfs_last_byte(struct inode *inode, unsigned long page_nr)
+{
+	unsigned last_byte = inode->i_size;
+
+	last_byte -= page_nr << PAGE_SHIFT;
+	if (last_byte > PAGE_SIZE)
+		last_byte = PAGE_SIZE;
+	return last_byte;
+}
+
+static inline int sfs_match(struct super_block *sb, const unsigned char *name, struct sfs_dir_entry *de)
+{
+	if (!de->i_no)
+		return 0;
+	return !memcmp(name, de->filename, SFS_NAME_LEN);
+}
+
+struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr, struct page **res_page)
+{
+	struct super_block *sb = dir->i_sb;
+	const unsigned char *name = qstr->name;
+	int namelen = qstr->len;
+	unsigned reclen = sizeof(struct sfs_dir_entry);
+	unsigned long start, n;
+	unsigned long npages = dir_pages(dir);
+	struct page *page = NULL;
+	struct sfs_inode_info *si = SFS_I(dir);
+	struct sfs_dir_entry *de;
+
+	*res_page = NULL;
+
+	start = si->i_dir_start_lookup;
+
+	if (start >= npages)
+		start = 0;
+
+	n = start;
+	do {
+		char *kaddr;
+		page = sfs_get_page(dir, n);
+		if (!IS_ERR(page)) {
+			kaddr = page_address(page);
+			de = (struct sfs_dir_entry *) kaddr;
+			kaddr += sfs_last_byte(dir, n) - reclen;
+			while ((char *) de <= kaddr) {
+				if (sfs_match(sb, name, de))
+					goto found;
+				de = de + reclen;
+			}
+			sfs_put_page(page);
+		}
+		if (++n >= npages)
+			n = 0;
+	} while (n != start);
+
+	return NULL;
+
+found:
+	*res_page = page;
+	si->i_dir_start_lookup = n;
+	return de;
+}
+
+ino_t sfs_inode_by_name(struct inode *dir, const struct qstr *qstr)
+{
+	ino_t ret = 0;
+	struct sfs_dir_entry *de;
+	struct page *page;
+
+	de = sfs_find_entry(dir, qstr, &page);
+	if (de) {
+		ret = le32_to_cpu(de->i_no);
+		sfs_put_page(page);
+	}
+	return ret;
+}
+
+static struct dentry *sfs_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags)
+{
+	struct inode *inode = NULL;
+	ino_t ino;
+
+	printk(KERN_ERR "sfs: lookup\n");
+	if (dentry->d_name.len > SFS_NAME_LEN)
+		return ERR_PTR(-ENAMETOOLONG);
+
+	ino = sfs_inode_by_name(dir, &dentry->d_name);
+	if (ino)
+		inode = sfs_iget(dir->i_sb, ino);
+	return d_splice_alias(inode, dentry);
+}
 
 int sfs_getattr(const struct path *path, struct kstat *stat,
 		u32 request_mask, unsigned int query_flags)
 {
 	struct inode *inode = d_inode(path->dentry);
 //	struct ext2_inode_info ei = SFS_I(inode);
-
-	printk(KERN_ERR "sfs_getattr");
 
 	generic_fillattr(inode, stat);
 
@@ -113,8 +302,8 @@ int sfs_setattr(struct dentry *dentry, struct iattr *iattr)
 struct inode_operations sfs_dir_inode_operations = {
 /*
 	.create		= sfs_create,
-	.lookup         = sfs_lookup,
 */	
+	.lookup         = sfs_lookup,
 /*
 	.link           = sfs_link,
 	.unlink         = sfs_unlink,
@@ -124,9 +313,9 @@ struct inode_operations sfs_dir_inode_operations = {
 	.mknod          = sfs_mknod,
 	.rename         = sfs_rename,
 */	
-/*
 	.getattr        = sfs_getattr,
 	.setattr        = sfs_setattr,
+/*
 	.get_acl        = sfs_get_acl,
 	.set_acl        = sfs_set_acl,
 	.tmpfile        = sfs_tmpfile,
@@ -143,21 +332,24 @@ struct inode_operations sfs_dir_inode_operations = {
 
 
 
+static int sfs_readdir(struct file *file, struct dir_context *ctx)
+{
+	loff_t pos = ctx->pos;
 
 
 
-
+}
 
 struct file_operations sfs_dir_operations = {
         .llseek         = generic_file_llseek,
         .read           = generic_read_dir,
+	.fsync          = generic_file_fsync,
+	.iterate_shared	= sfs_readdir,
 /*
-	.iterate_shared = sfs_readdir,
 	.unlocked_ioctl = sfs_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl   = sfs_compat_ioctl,
 #endif
-	.fsync          = sfs_fsync,
 */	
 };
 
@@ -174,23 +366,25 @@ struct file_operations sfs_dir_operations = {
 
 
 
-
+const struct inode_operations sfs_file_inode_operations = {
+		.setattr = sfs_setattr,
+};
 
 const struct file_operations sfs_file_operations = {
 	.llseek		= generic_file_llseek,
+	.read_iter	= generic_file_read_iter,
+	.write_iter	= generic_file_write_iter,
 /*
-	.read_iter	= sfs_file_read_iter,
-	.write_iter	= sfs_file_write_iter,
 	.unlocked_ioctl = sfs_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= sfs_compat_ioctl,
 #endif
 */
 	.mmap		= generic_file_mmap,
+	.open		= generic_file_open,
+	.fsync		= generic_file_fsync,
 /*
-	.open		= dquot_file_open,
 	.release	= sfs_release_file,
-	.fsync		= sfs_fsync,
 	.get_unmapped_area = thp_get_unmapped_area,
 */	
 	.splice_read	= generic_file_splice_read,
@@ -255,7 +449,7 @@ static int read_raw_super_block(struct sfs_sb_info *sbi,
 	for (block = 0; block < 2; block++) {
 		bh = sb_bread(sb, block);
 		if (!bh) {
-			sfs_msg(sb, KERN_ERR, "Unable to read %th superblock", block + 1);
+			sfs_msg(sb, KERN_ERR, "Failed to read %th superblock", block + 1);
 			err = -EIO;
 			continue;
 		}
@@ -276,12 +470,16 @@ static int read_raw_super_block(struct sfs_sb_info *sbi,
 	return err;
 }
 
-static struct sfs_inode *sfs_get_inode(struct super_block *sb, ino_t ino,
+static int sfs_get_inode(struct inode *inode, ino_t ino,
 		struct buffer_head **p)
 {       
+	struct super_block *sb = inode->i_sb;
+	struct sfs_inode *raw_inode;
 	struct buffer_head * bh;
 	unsigned long block;
 	unsigned long offset;
+	uid_t i_uid;
+	gid_t i_gid;
 
 /*
 	 *p = NULL;
@@ -296,39 +494,13 @@ static struct sfs_inode *sfs_get_inode(struct super_block *sb, ino_t ino,
 		goto Eio;
 
 	*p = bh;
-	return (struct sfs_inode *)bh->b_data;
+	raw_inode = (struct sfs_inode *)bh->b_data;
 /*
 Einval:
 	sfs_error(sb, "sfs_get_inode", "bad inode number: %lu",
 			(unsigned long) ino);
 	return ERR_PTR(-EINVAL);
 */
-
-Eio:
-	sfs_msg(sb, KERN_ERR, "sfs_get_inode", "unable to read inode block - inode=%lu, block=%lu",
-				(unsigned long) ino, block);
-	return 0;
-
-/*
-Egdp:
-	return ERR_PTR(-EIO);
-*/
-}
-
-
-struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
-{
-	struct sfs_inode *raw_inode;
-	struct buffer_head *bh;
-	struct inode *inode;
-	uid_t i_uid;
-	gid_t i_gid;
-
-	inode = iget_locked(sb, ino);
-	inode->i_sb = sb;
-
-	raw_inode = sfs_get_inode(inode->i_sb, ino, &bh);
-
 	inode->i_mode = le16_to_cpu(raw_inode->i_mode);
 	i_uid = (uid_t)le16_to_cpu(raw_inode->i_uid);
 	i_gid = (gid_t)le16_to_cpu(raw_inode->i_gid);
@@ -351,8 +523,60 @@ struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
 
 	}
 
+	return 0;
+
+Eio:
+	sfs_msg(sb, KERN_ERR, "sfs_get_inode", "unable to read inode block - inode=%lu, block=%lu",
+				(unsigned long) ino, block);
+	return -EIO;
+
+/*
+Egdp:
+	return ERR_PTR(-EIO);
+*/
+}
+
+static void sfs_set_inode_ops(struct inode *inode)
+{
+	if (S_ISREG(inode->i_mode)) {
+		inode->i_op = &sfs_file_inode_operations;
+		inode->i_fop = &sfs_file_operations;
+		inode->i_mapping->a_ops = &sfs_aops;
+	} else if (S_ISDIR(inode->i_mode)) {
+		inode->i_op = &sfs_dir_inode_operations;
+		inode->i_fop = &sfs_dir_operations;
+		inode->i_mapping->a_ops = &sfs_aops;
+	} 
+}
+
+struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
+{
+	struct buffer_head *bh;
+	struct inode *inode;
+	int err;
+
+	inode = iget_locked(sb, ino);
+	if (!inode)
+		return ERR_PTR(-ENOMEM);
+	if (!(inode->i_state & I_NEW))
+		return inode;
+
+	inode->i_sb = sb;
+
+	err = sfs_get_inode(inode, ino, &bh);
 	brelse(bh);
+	if (err)
+		goto bad_inode;
+
+	inode_inc_iversion(inode);
+
+	sfs_set_inode_ops(inode);
+
 	return inode;
+
+bad_inode:
+	iget_failed(inode);
+	return ERR_PTR(err);
 }
 
 static int sfs_fill_super(struct super_block *sb, void *data, int silent)
@@ -361,50 +585,62 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 	struct sfs_sb_info *sbi;
 	struct inode *root;
 	int valid_super_block;
-	int err;
+	int ret;
+	int i;
+
+	raw_super = NULL;
 
 	sbi = kzalloc(sizeof(struct sfs_sb_info), GFP_KERNEL);
-	if (!sbi) {
-		sfs_msg(sb, KERN_ERR, "unable to alloc sbi");
-		goto free_sbi;
-	}
-
-	sbi->sb = sb;
-
-	if (unlikely(!sb_set_blocksize(sb, SFS_BLKSIZE))) {
-		sfs_msg(sb, KERN_ERR, "unable to set blocksize");
-		goto free_sbi;
-	}
-
-	err = read_raw_super_block(sbi, &raw_super, &valid_super_block);
-	if (err) {
-		sfs_msg(sb, KERN_ERR, "Unable to read superblock");
-		goto free_sbi;
-	}
+	if (!sbi)
+		goto failed_nomem;
 
 	sb->s_fs_info = sbi;
-	sbi->raw_super = raw_super;
-	sb->s_magic = le64_to_cpu(raw_super->magic);	
+	sbi->sb = sb;
 
-	if (sb->s_magic != SFS_SUPER_MAGIC) {
-		sfs_msg(sb, KERN_ERR, "unable to get magic");
-		goto failed;
+	if (!sb_set_blocksize(sb, SFS_BLKSIZE)) {
+		sfs_msg(sb, KERN_ERR, "Failed to set blocksize");
+		goto free_sbi;
 	}
 
+	ret = read_raw_super_block(sbi, &raw_super, &valid_super_block);
+	if (ret) {
+		sfs_msg(sb, KERN_ERR, "Failed to read superblock");
+		goto free_sbi;
+	}
+
+	if (le32_to_cpu(raw_super->magic) != SFS_SUPER_MAGIC) {
+		sfs_msg(sb, KERN_ERR, "Failed to get magic");
+		goto free_raw_super;
+	}
+
+	sbi->raw_super = raw_super;
 	sb->s_op = &sfs_sops;
+	sb->s_magic = le64_to_cpu(raw_super->magic);	
 
 	root = sfs_iget(sb, SFS_ROOT_INO);
+	if (IS_ERR(root)) {
+		ret = PTR_ERR(root);
+		goto free_raw_super;
+	}
 	sb->s_root = d_make_root(root);
+	if (!sb->s_root) {
+		ret = -ENOMEM;
+		goto free_raw_super;
+	}
 
 	return 0;
 
-failed:
+free_raw_super:
 	kvfree(raw_super);
 
 free_sbi:
 	kvfree(sbi);
+	sb->s_fs_info = NULL;
+	return ret;
 
-	return -1;
+failed_nomem:
+	sfs_msg(sb, KERN_ERR, "ENOMEM");
+	return -ENOMEM;
 }
 
 static struct dentry *sfs_mount(struct file_system_type *fs_type, int flags,
@@ -447,6 +683,6 @@ static void __exit exit_sfs_fs(void)
 module_init(init_sfs_fs)
 module_exit(exit_sfs_fs)
 
-MODULE_AUTHOR("Lee Jeyeon at DanKook Univ");
-MODULE_DESCRIPTION("Simple File System");
+MODULE_AUTHOR("Jeyeon Lee at DanKook Univ");
+MODULE_DESCRIPTION("Very Simple File System");
 MODULE_LICENSE("GPL");

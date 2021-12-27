@@ -294,6 +294,7 @@ set_sb_le64	mkfs/sfs_fs.h	192;"	d
 set_sb_le64	sfs_fs.h	47;"	d
 sfs_add_default_dentry_root	mkfs/mkfs_format.c	/^static int sfs_add_default_dentry_root(void)$/;"	f	file:
 sfs_alloc_inode	super.c	/^static struct inode *sfs_alloc_inode(struct super_block *sb)$/;"	f	file:
+sfs_aops	super.c	/^const struct address_space_operations sfs_aops = {$/;"	v	typeref:struct:address_space_operations
 sfs_clear_bit	mkfs/mkfs_lib.c	/^int sfs_clear_bit(unsigned int nr, char *addr)$/;"	f
 sfs_configuration	mkfs/sfs_fs.h	/^struct sfs_configuration {$/;"	s
 sfs_configuration	sfs_fs.h	/^struct sfs_configuration {$/;"	s
@@ -309,8 +310,9 @@ sfs_file_operations	super.c	/^const struct file_operations sfs_file_operations =
 sfs_fill_super	super.c	/^static int sfs_fill_super(struct super_block *sb, void *data, int silent)$/;"	f	file:
 sfs_format_device	mkfs/mkfs_format.c	/^int sfs_format_device(void)$/;"	f
 sfs_fs_type	super.c	/^static struct file_system_type sfs_fs_type = {$/;"	v	typeref:struct:file_system_type	file:
+sfs_get_block	super.c	/^static int sfs_get_block(struct inode *inode, sector_t iblock,$/;"	f	file:
 sfs_get_device_info	mkfs/mkfs_lib.c	/^int sfs_get_device_info(void)$/;"	f
-sfs_get_inode	super.c	/^static struct sfs_inode *sfs_get_inode(struct super_block *sb, ino_t ino,$/;"	f	file:
+sfs_get_inode	super.c	/^static int sfs_get_inode(struct inode *inode, ino_t ino,$/;"	f	file:
 sfs_getattr	super.c	/^int sfs_getattr(const struct path *path, struct kstat *stat,$/;"	f
 sfs_iget	super.c	/^struct inode *sfs_iget(struct super_block *sb, unsigned long ino)$/;"	f
 sfs_init_configuration	mkfs/mkfs_main.c	/^void sfs_init_configuration(void)$/;"	f
@@ -322,8 +324,11 @@ sfs_mount	super.c	/^static struct dentry *sfs_mount(struct file_system_type *fs_
 sfs_msg	super.c	/^void sfs_msg(struct super_block *sb, const char *level, const char *fmt, ...)$/;"	f
 sfs_parse_options	mkfs/mkfs_main.c	/^static void sfs_parse_options(int argc, char *argv[])$/;"	f	file:
 sfs_prepare_super_block	mkfs/mkfs_format.c	/^static int sfs_prepare_super_block(void) {$/;"	f	file:
+sfs_readdir	super.c	/^static int sfs_readdir(struct file *file, struct dir_context *ctx)$/;"	f	file:
+sfs_readpage	super.c	/^static int sfs_readpage(struct file *file, struct page *page)$/;"	f	file:
 sfs_sb_info	sfs.h	/^struct sfs_sb_info {$/;"	s
 sfs_set_bit	mkfs/mkfs_lib.c	/^int sfs_set_bit(unsigned int nr, char *addr)$/;"	f
+sfs_set_inode_ops	super.c	/^static void sfs_set_inode_ops(struct inode *inode)$/;"	f	file:
 sfs_setattr	super.c	/^int sfs_setattr(struct dentry *dentry, struct iattr *iattr)$/;"	f
 sfs_show_info	mkfs/mkfs_main.c	/^static void sfs_show_info(void) {$/;"	f	file:
 sfs_sops	super.c	/^static const struct super_operations sfs_sops = {$/;"	v	typeref:struct:super_operations	file:
@@ -333,8 +338,12 @@ sfs_test_bit	mkfs/mkfs_lib.c	/^int sfs_test_bit(unsigned int nr, const char *p)$
 sfs_update_dmap	mkfs/mkfs_format.c	/^static int sfs_update_dmap(u32 blkaddr)$/;"	f	file:
 sfs_update_imap	mkfs/mkfs_format.c	/^static int sfs_update_imap(u32 blkaddr)$/;"	f	file:
 sfs_update_maps_root	mkfs/mkfs_format.c	/^static int sfs_update_maps_root(void)$/;"	f	file:
+sfs_write_begin	super.c	/^static int sfs_write_begin(struct file *file, struct address_space *mapping,$/;"	f	file:
+sfs_write_end	super.c	/^static int sfs_write_end(struct file *file, struct address_space *mapping,$/;"	f	file:
+sfs_write_failed	super.c	/^static void sfs_write_failed(struct address_space *mapping, loff_t to)$/;"	f	file:
 sfs_write_root_inode	mkfs/mkfs_format.c	/^static int sfs_write_root_inode(void)$/;"	f	file:
 sfs_write_super_block	mkfs/mkfs_format.c	/^static int sfs_write_super_block(void)$/;"	f	file:
+sfs_writepage	super.c	/^static int sfs_writepage(struct page *page, struct writeback_control *wbc)$/;"	f	file:
 sparse_read_blk	mkfs/mkfs_io.c	/^static int sparse_read_blk(__u64 block, int count, void *buf) { return 0; }$/;"	f	file:
 sparse_write_blk	mkfs/mkfs_io.c	/^static int sparse_write_blk(__u64 block, int count, const void *buf) { return 0; }$/;"	f	file:
 start_blkaddr	mkfs/sfs_fs.h	/^	u_int64_t start_blkaddr;$/;"	m	struct:sfs_configuration
