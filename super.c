@@ -85,7 +85,30 @@ static void destroy_inode_cache(void)
 
 
 
+int sfs_getattr(const struct path *path, struct kstat *stat,
+		u32 request_mask, unsigned int query_flags)
+{
+	struct inode *inode = d_inode(path->dentry);
+//	struct ext2_inode_info ei = SFS_I(inode);
 
+	printk(KERN_ERR "sfs_getattr");
+
+	generic_fillattr(inode, stat);
+
+	return 0;
+}
+
+int sfs_setattr(struct dentry *dentry, struct iattr *iattr)
+{
+	struct inode *inode = d_inode(dentry);
+	int error;
+
+	error = setattr_prepare(dentry, iattr);
+	if (error)
+		return error;
+
+	return error;
+}
 
 struct inode_operations sfs_dir_inode_operations = {
 /*
@@ -215,22 +238,130 @@ static const struct super_operations sfs_sops = {
 */	
 };
 
-static int sfs_fill_super(struct super_block *sb, void *data, int silent)
+static int read_raw_super_block(struct sfs_sb_info *sbi,
+			struct sfs_super_block **raw_super,
+			int *valid_super_block)
 {
+	struct super_block *sb = sbi->sb;
+	struct sfs_super_block *super;
 	struct buffer_head *bh;
-	struct sfs_sb_info *sbi;
-	struct sfs_super_block *raw_super;
-	struct inode *root;
+	int block;
+	int err = 0;
 
-	struct sfs_inode_info *si;
+	super = kzalloc(sizeof(struct sfs_super_block), GFP_KERNEL);
+	if (!super)
+		return -ENOMEM;
+	
+	for (block = 0; block < 2; block++) {
+		bh = sb_bread(sb, block);
+		if (!bh) {
+			sfs_msg(sb, KERN_ERR, "Unable to read %th superblock", block + 1);
+			err = -EIO;
+			continue;
+		}
+
+		if (!*raw_super) {
+			memcpy(super, bh->b_data + SFS_SUPER_OFFSET, sizeof(*super));
+			*valid_super_block = block;
+			*raw_super = super;
+		}
+		brelse(bh);
+	}
+
+	if (!*raw_super)
+		kvfree(super);
+	else
+		err = 0;
+
+	return err;
+}
+
+static struct sfs_inode *sfs_get_inode(struct super_block *sb, ino_t ino,
+		struct buffer_head **p)
+{       
+	struct buffer_head * bh;
 	unsigned long block;
+	unsigned long offset;
+
+/*
+	 *p = NULL;
+	 if ((ino != SFS_ROOT_INO && ino < SFS_FIRST_INO(sb)) ||
+	 ino > le32_to_cpu(EXT2_SB(sb)->s_es->s_inodes_count))
+	 goto Einval;
+*/
+
+	offset = (ino - SFS_ROOT_INO);
+	block = SFS_GET_SB(sb, inodes_blkaddr) + offset;
+	if (!(bh = sb_bread(sb, block)))
+		goto Eio;
+
+	*p = bh;
+	return (struct sfs_inode *)bh->b_data;
+/*
+Einval:
+	sfs_error(sb, "sfs_get_inode", "bad inode number: %lu",
+			(unsigned long) ino);
+	return ERR_PTR(-EINVAL);
+*/
+
+Eio:
+	sfs_msg(sb, KERN_ERR, "sfs_get_inode", "unable to read inode block - inode=%lu, block=%lu",
+				(unsigned long) ino, block);
+	return 0;
+
+/*
+Egdp:
+	return ERR_PTR(-EIO);
+*/
+}
+
+
+struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
+{
 	struct sfs_inode *raw_inode;
-	int n;
+	struct buffer_head *bh;
+	struct inode *inode;
 	uid_t i_uid;
 	gid_t i_gid;
 
-	ino_t ino = SFS_ROOT_INO;
-	unsigned long offset;
+	inode = iget_locked(sb, ino);
+	inode->i_sb = sb;
+
+	raw_inode = sfs_get_inode(inode->i_sb, ino, &bh);
+
+	inode->i_mode = le16_to_cpu(raw_inode->i_mode);
+	i_uid = (uid_t)le16_to_cpu(raw_inode->i_uid);
+	i_gid = (gid_t)le16_to_cpu(raw_inode->i_gid);
+	i_uid_write(inode, i_uid);
+	i_gid_write(inode, i_gid);
+	set_nlink(inode, le16_to_cpu(raw_inode->i_links));
+	inode->i_size = le32_to_cpu(raw_inode->i_size);
+	inode->i_atime.tv_sec = (signed)le32_to_cpu(raw_inode->i_atime);
+	inode->i_ctime.tv_sec = (signed)le32_to_cpu(raw_inode->i_ctime);
+	inode->i_mtime.tv_sec = (signed)le32_to_cpu(raw_inode->i_mtime);
+	inode->i_atime.tv_nsec = inode->i_mtime.tv_nsec = inode->i_ctime.tv_nsec = 0;
+	inode->i_blocks = le32_to_cpu(raw_inode->i_blocks);
+
+	if (S_ISREG(inode->i_mode)) {
+
+	} else if (S_ISDIR(inode->i_mode)) {
+		inode->i_op = &sfs_dir_inode_operations;
+		inode->i_fop = &sfs_dir_operations;
+	} else {
+
+	}
+
+	brelse(bh);
+	return inode;
+}
+
+static int sfs_fill_super(struct super_block *sb, void *data, int silent)
+{
+	struct sfs_super_block *raw_super;
+	struct sfs_sb_info *sbi;
+	struct inode *root;
+	int valid_super_block;
+	int err;
 
 	sbi = kzalloc(sizeof(struct sfs_sb_info), GFP_KERNEL);
 	if (!sbi) {
@@ -238,28 +369,18 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto free_sbi;
 	}
 
-	//sbi->sb = sb;
+	sbi->sb = sb;
 
 	if (unlikely(!sb_set_blocksize(sb, SFS_BLKSIZE))) {
 		sfs_msg(sb, KERN_ERR, "unable to set blocksize");
 		goto free_sbi;
 	}
 
-// read_raw_super_block {
-	raw_super = kzalloc(sizeof(struct sfs_super_block), GFP_KERNEL);
-	if (!raw_super) {
-		sfs_msg(sb, KERN_ERR, "unable to alloc super");
-		goto free_raw_super;
+	err = read_raw_super_block(sbi, &raw_super, &valid_super_block);
+	if (err) {
+		sfs_msg(sb, KERN_ERR, "Unable to read superblock");
+		goto free_sbi;
 	}
-
-	block = 0;
-	if (!(bh = sb_bread(sb, block))) {
-		sfs_msg(sb, KERN_ERR, "unable to read superblock");
-		goto brelse_bh;
-	}
-
-	memcpy(raw_super, bh->b_data + SFS_SUPER_OFFSET, sizeof(*raw_super));
-// }
 
 	sb->s_fs_info = sbi;
 	sbi->raw_super = raw_super;
@@ -272,65 +393,12 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	sb->s_op = &sfs_sops;
 
-// sfs_iget {
-	root = iget_locked(sb, ino);		
-
-	si = SFS_I(root);
-	root->i_sb = sb;
-
-	//sfs_get_inode {
-	offset = (ino - SFS_ROOT_INO);
-	block = SFS_GET_SB(sb, inodes_blkaddr) + offset;
-	if (!(bh = sb_bread(sb, block))) {
-		sfs_msg(sb, KERN_ERR, "unable to read root inode");
-		goto failed;
-	}
-	raw_inode = (struct sfs_inode *)bh->b_data;
-	// }
-	
-	root->i_mode = le16_to_cpu(raw_inode->i_mode);
-	i_uid = (uid_t)le16_to_cpu(raw_inode->i_uid);
-	i_gid = (gid_t)le16_to_cpu(raw_inode->i_gid);
-	i_uid_write(root, i_uid);
-	i_gid_write(root, i_gid);
-	set_nlink(root, le16_to_cpu(raw_inode->i_links));
-	root->i_size = le32_to_cpu(raw_inode->i_size);
-	root->i_atime.tv_sec = (signed)le32_to_cpu(raw_inode->i_atime);
-	root->i_ctime.tv_sec = (signed)le32_to_cpu(raw_inode->i_ctime);
-	root->i_mtime.tv_sec = (signed)le32_to_cpu(raw_inode->i_mtime);
-	root->i_atime.tv_nsec = root->i_mtime.tv_nsec = root->i_ctime.tv_nsec = 0;
-	root->i_blocks = le32_to_cpu(raw_inode->i_blocks);
-
-	si->i_dir_start_lookup = 0;
-	for (n = 0; n < DEF_ADDRS_PER_INODE; n++)
-		si->i_data[n] = raw_inode->d_addr[n];
-	for (; n < DEF_SFS_N_BLOCKS; n++)
-		si->i_data[n] = raw_inode->i_addr[n - DEF_ADDRS_PER_BLOCK];
-	
-
-	if (S_ISREG(root->i_mode)) {
-
-	} else if (S_ISDIR(root->i_mode)) {
-		root->i_op = &sfs_dir_inode_operations;
-		root->i_fop = &sfs_dir_operations;
-	} else {
-
-	}	
-// }
-
+	root = sfs_iget(sb, SFS_ROOT_INO);
 	sb->s_root = d_make_root(root);
 
-	brelse(bh);
-	
 	return 0;
 
 failed:
-
-
-brelse_bh:
-	brelse(bh);
-
-free_raw_super:
 	kvfree(raw_super);
 
 free_sbi:
