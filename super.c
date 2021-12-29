@@ -111,6 +111,8 @@ static struct page *sfs_get_page(struct inode *dir, unsigned long n)
 {
 	struct address_space *mapping = dir->i_mapping;
 	struct page *page = read_mapping_page(mapping, n, NULL);
+
+	printk(KERN_ERR "jy: get_page\n");
 	if (!IS_ERR(page)) {
 		kmap(page);
 		if (unlikely(!PageChecked(page))) {
@@ -313,7 +315,9 @@ static struct dentry *sfs_lookup(struct inode *dir, struct dentry *dentry, unsig
 	struct inode *inode = NULL;
 	ino_t ino;
 
-	printk(KERN_ERR "jy: lookup\n");
+	char *name = kzalloc(20, GFP_KERNEL);
+	memcpy(name, dentry->d_name.name, dentry->d_name.len);
+	printk(KERN_ERR "jy: lookup:%s(%d)\n", name, dentry->d_name.len);
 	if (dentry->d_name.len > SFS_NAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
@@ -655,7 +659,7 @@ struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
 	inode->i_sb = sb;
 
 	bh = sb_bread(sb, sfs_inotoba(ino));
-	printk(KERN_ERR "jy: iget0 %ld\n", sfs_inotoba(ino));
+	printk(KERN_ERR "jy: iget0 %lx\n", sfs_inotoba(ino));
 	if (!bh) {
 		sfs_msg(sb, "Failed to read inode %d\n", ino);
 		goto bad_inode;
