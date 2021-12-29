@@ -315,7 +315,7 @@ struct indirect_node {
                                 DENTRY_IN_BLOCK + SIZE_OF_DENTRY_BITMAP))
 
 struct sfs_dir_entry {
-        __le16 file_type;               /* file type */
+        __le32 file_type;               /* file type */
         __le32 i_no;			/* inode number */
         __le32 i_addr;                  /* inode address */
         __u8 filename[SFS_NAME_LEN];    /* file name */

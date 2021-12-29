@@ -131,8 +131,8 @@ struct sfs_inode {
         __le32 i_namelen;               /* file name length */
         __u8 i_name[SFS_NAME_LEN];      /* file name for SPOR */
 
-        __le32 d_addr[DEF_ADDRS_PER_INODE];     /* Pointers to data blocks */
-        __le32 i_addr[DEF_IDPS_PER_INODE];      /* indirect, double indirect,
+        __le32 i_dblock[DEF_ADDRS_PER_INODE];     /* Pointers to data blocks */
+        __le32 i_iblock[DEF_IDPS_PER_INODE];      /* indirect, double indirect,
                                                 triple_indirect block address*/
 } __attribute__((packed));
 
@@ -156,7 +156,7 @@ struct indirect_node {
                                 DENTRY_IN_BLOCK + SIZE_OF_DENTRY_BITMAP))
 
 struct sfs_dir_entry {
-        __le16 file_type;               /* file type */
+        __le32 file_type;               /* file type */
         __le32 i_no;                    /* inode number */
         __le32 i_addr;                  /* inode address */
         __u8 filename[SFS_NAME_LEN];    /* file name */
@@ -177,6 +177,7 @@ enum {
         SFS_SYMLINK
 };
 
+#define SFS_REC_LEN			(sizeof(struct sfs_dir_entry))
 #define SFS_IMAP_BLK_OFFSET		2	/* imap block offset is 1 */
 #define SFS_IMAP_BYTE_OFFSET		4096	/* imap byte offset is 4096 */
 #define MAP_SIZE_ALIGN(size)		((size) + SFS_BLKSIZE) / SFS_BLKSIZE

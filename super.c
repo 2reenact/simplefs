@@ -24,6 +24,7 @@
 #include <linux/uaccess.h>
 #include <linux/dax.h>
 #include <linux/iversion.h>
+#include <linux/writeback.h>
 
 //#include <linux/sfs_fs.h>
 #include "sfs.h"
@@ -45,6 +46,26 @@ void sfs_msg(struct super_block *sb, const char *level, const char *fmt, ...)
 }
 
 static struct kmem_cache *sfs_inode_cachep;
+
+static struct inode *sfs_alloc_inode(struct super_block *sb)
+{
+	struct sfs_inode_info *si;
+	printk(KERN_ERR "jy: alloc inode\n");
+
+	si = kmem_cache_alloc(sfs_inode_cachep, GFP_KERNEL);
+	if (!si)
+		return NULL;
+
+	inode_set_iversion(&si->vfs_inode, 1);
+
+	return &si->vfs_inode;
+}
+
+static void sfs_free_inode(struct inode *inode)
+{
+	printk(KERN_ERR "jy: free_inode\n");
+	kmem_cache_free(sfs_inode_cachep, SFS_I(inode));
+}
 
 static void init_once(void *foo)
 {
@@ -72,10 +93,9 @@ static void destroy_inode_cache(void)
 	 * Make sure all delayed rcu free inodes are flushed before we
 	 * destroy cache.
 	 */
+	rcu_barrier();
 	kmem_cache_destroy(sfs_inode_cachep);
 }
-
-
 
 
 
@@ -108,18 +128,25 @@ fail:
 static int sfs_get_block(struct inode *inode, sector_t iblock,
 		struct buffer_head *bh_result, int create)
 {
+	struct super_block *sb = inode->i_sb;
+
 	unsigned max_blocks;
+	int err;
+
+	printk(KERN_ERR "jy: get_block %lld\n", iblock);	
 
 	return 0;
 }
 
 static int sfs_writepage(struct page *page, struct writeback_control *wbc)
 {
+	printk(KERN_ERR "jy: writepage \n");
 	return block_write_full_page(page, sfs_get_block, wbc);
 }
 
 static int sfs_readpage(struct file *file, struct page *page)
 {
+	printk(KERN_ERR "jy: readpage \n");
 	return block_read_full_page(page, sfs_get_block);
 }
 
@@ -130,7 +157,9 @@ int sfs_prepare_chunk(struct page *page, loff_t pos, unsigned len)
 }
 #endif
 
-static void sfs_truncate_blocks(struct inode *);
+static void sfs_truncate_blocks(struct inode * inode) {
+
+}
 
 static void sfs_write_failed(struct address_space *mapping, loff_t to)
 {
@@ -148,6 +177,7 @@ static int sfs_write_begin(struct file *file, struct address_space *mapping,
 {
 	int ret;
 
+	printk(KERN_ERR "jy: write_begin\n");
 	ret = block_write_begin(mapping, pos, len, flags, pagep,
 			sfs_get_block);
 	if (unlikely(ret))
@@ -162,18 +192,26 @@ static int sfs_write_end(struct file *file, struct address_space *mapping,
 {
 	int ret;
 
+	printk(KERN_ERR "jy: write_end\n");
+	if (unlikely(ret))
+		sfs_write_failed(mapping, pos + len);
 	ret = generic_write_end(file, mapping, pos, len, copied, page, fsdata);
 	if (ret < len)
 		sfs_write_failed(mapping, pos + len);
 	return ret;
 }
 
+static sector_t ufs_bmap(struct address_space *mapping, sector_t block)
+{
+	return generic_block_bmap(mapping,block, sfs_get_block);
+}
+
 const struct address_space_operations sfs_aops = {
 	.readpage	= sfs_readpage,
-/*
 	.writepage	= sfs_writepage,
 	.write_begin	= sfs_write_begin,
 	.write_end	= sfs_write_end,
+/*
 	.bmap		= sfs_bmap,
 */
 };
@@ -206,13 +244,14 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 	struct super_block *sb = dir->i_sb;
 	const unsigned char *name = qstr->name;
 	int namelen = qstr->len;
-	unsigned reclen = sizeof(struct sfs_dir_entry);
+	unsigned reclen = SFS_REC_LEN;
 	unsigned long start, n;
 	unsigned long npages = dir_pages(dir);
 	struct page *page = NULL;
 	struct sfs_inode_info *si = SFS_I(dir);
 	struct sfs_dir_entry *de;
 
+	printk(KERN_ERR "jy: find_entry %s\n", name);
 	*res_page = NULL;
 
 	start = si->i_dir_start_lookup;
@@ -221,14 +260,19 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 		start = 0;
 
 	n = start;
+	printk(KERN_ERR "jy: find_entry0\n");
 	do {
 		char *kaddr;
+		printk(KERN_ERR "jy: find_entry1: %ld\n", n);
 		page = sfs_get_page(dir, n);
 		if (!IS_ERR(page)) {
 			kaddr = page_address(page);
 			de = (struct sfs_dir_entry *) kaddr;
+			printk(KERN_ERR "jy: find_entry2 %p\n", kaddr);
 			kaddr += sfs_last_byte(dir, n) - reclen;
+			printk(KERN_ERR "jy: find_entry3 %p\n", kaddr);
 			while ((char *) de <= kaddr) {
+				printk(KERN_ERR "jy: find_entry4\n");
 				if (sfs_match(sb, name, de))
 					goto found;
 				de = de + reclen;
@@ -238,10 +282,12 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 		if (++n >= npages)
 			n = 0;
 	} while (n != start);
+	printk(KERN_ERR "jy: find_entry5\n");
 
 	return NULL;
 
 found:
+	printk(KERN_ERR "jy: find_entry6\n");
 	*res_page = page;
 	si->i_dir_start_lookup = n;
 	return de;
@@ -253,6 +299,7 @@ ino_t sfs_inode_by_name(struct inode *dir, const struct qstr *qstr)
 	struct sfs_dir_entry *de;
 	struct page *page;
 
+	printk(KERN_ERR "jy: inode_by_name\n");
 	de = sfs_find_entry(dir, qstr, &page);
 	if (de) {
 		ret = le32_to_cpu(de->i_no);
@@ -266,7 +313,7 @@ static struct dentry *sfs_lookup(struct inode *dir, struct dentry *dentry, unsig
 	struct inode *inode = NULL;
 	ino_t ino;
 
-	printk(KERN_ERR "sfs: lookup\n");
+	printk(KERN_ERR "jy: lookup\n");
 	if (dentry->d_name.len > SFS_NAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
@@ -280,22 +327,29 @@ int sfs_getattr(const struct path *path, struct kstat *stat,
 		u32 request_mask, unsigned int query_flags)
 {
 	struct inode *inode = d_inode(path->dentry);
-//	struct ext2_inode_info ei = SFS_I(inode);
 
 	generic_fillattr(inode, stat);
 
 	return 0;
 }
 
-int sfs_setattr(struct dentry *dentry, struct iattr *iattr)
+int sfs_setattr(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = d_inode(dentry);
+	unsigned int ia_valid = attr->ia_valid;
 	int error;
 
-	error = setattr_prepare(dentry, iattr);
+	printk(KERN_ERR "jy: setattr\n");
+	error = setattr_prepare(dentry, attr);
 	if (error)
 		return error;
 
+	if (ia_valid & ATTR_SIZE && attr->ia_size != inode->i_size) {
+		
+	}
+
+	setattr_copy(inode, attr);
+	mark_inode_dirty(inode);
 	return error;
 }
 
@@ -312,8 +366,8 @@ struct inode_operations sfs_dir_inode_operations = {
 	.rmdir          = sfs_rmdir,
 	.mknod          = sfs_mknod,
 	.rename         = sfs_rename,
-*/	
 	.getattr        = sfs_getattr,
+*/	
 	.setattr        = sfs_setattr,
 /*
 	.get_acl        = sfs_get_acl,
@@ -335,9 +389,58 @@ struct inode_operations sfs_dir_inode_operations = {
 static int sfs_readdir(struct file *file, struct dir_context *ctx)
 {
 	loff_t pos = ctx->pos;
+	struct inode *inode = file_inode(file);
+	struct super_block *sb = inode->i_sb;
+	unsigned int offset = pos & ~PAGE_MASK;
+	unsigned long n = pos >> PAGE_SHIFT;
+	unsigned long npages = dir_pages(inode);
+	bool need_revalidate = !inode_eq_iversion(inode, file->f_version);
+
+	printk(KERN_ERR "jy: readdir\n");
+	if (pos > inode->i_size - SFS_REC_LEN)
+		return 0;
+
+	for ( ; n < npages; n++, offset = 0) {
+		char *kaddr, *limit;
+		struct sfs_dir_entry *de;
+
+		struct page *page = sfs_get_page(inode, n);
+
+		printk(KERN_ERR "jy: readdir 0\n");
+		if (IS_ERR(page)) {
+			sfs_msg(sb, KERN_ERR, "bad page in %lu", inode->i_ino);
+			ctx->pos += PAGE_SIZE - offset;
+			return -EIO;
+		}
+		printk(KERN_ERR "jy: readdir 1\n");
+		kaddr = page_address(page);
+		if (need_revalidate) {
+			if (offset) {
 
 
+			}
+		}
+		de = (struct sfs_dir_entry *)(kaddr + offset);
+		limit = kaddr + sfs_last_byte(inode, n) - SFS_REC_LEN;
+		for ( ; (char *)de <= limit; de += SFS_REC_LEN) {
+			printk(KERN_ERR "jy: readdir 2: %d-%s\n", de->i_no, de->filename);
+			if (de->i_no) {
+				unsigned char d_type = DT_UNKNOWN;
 
+				d_type = fs_ftype_to_dtype(de->file_type);
+				printk(KERN_ERR "jy: readdir 3\n");
+				if (!dir_emit(ctx, de->filename, SFS_NAME_LEN,
+						le32_to_cpu(de->i_no),
+						d_type)) {
+					sfs_put_page(page);
+					return 0;
+				}
+			}
+			ctx->pos += SFS_REC_LEN;
+		}
+		sfs_put_page(page);
+	}
+	return 0;
 }
 
 struct file_operations sfs_dir_operations = {
@@ -345,12 +448,6 @@ struct file_operations sfs_dir_operations = {
         .read           = generic_read_dir,
 	.fsync          = generic_file_fsync,
 	.iterate_shared	= sfs_readdir,
-/*
-	.unlocked_ioctl = sfs_ioctl,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl   = sfs_compat_ioctl,
-#endif
-*/	
 };
 
 
@@ -374,23 +471,10 @@ const struct file_operations sfs_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read_iter	= generic_file_read_iter,
 	.write_iter	= generic_file_write_iter,
-/*
-	.unlocked_ioctl = sfs_ioctl,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl	= sfs_compat_ioctl,
-#endif
-*/
 	.mmap		= generic_file_mmap,
 	.open		= generic_file_open,
 	.fsync		= generic_file_fsync,
-/*
-	.release	= sfs_release_file,
-	.get_unmapped_area = thp_get_unmapped_area,
-*/	
 	.splice_read	= generic_file_splice_read,
-/*
-	.splice_write	= iter_file_splice_write,
-*/	
 };
 
 
@@ -405,22 +489,65 @@ const struct file_operations sfs_file_operations = {
 
 
 
-static struct inode *sfs_alloc_inode(struct super_block *sb)
+static void sfs_fill_inode(struct inode *inode, struct sfs_inode *sfs_inode)
 {
-	struct sfs_inode_info *si;
-	si = kmem_cache_alloc(sfs_inode_cachep, GFP_KERNEL);
-	if (!si)
-		return NULL;
-	inode_set_iversion(&si->vfs_inode, 1);
+	struct super_block *sb = inode->i_sb;
+	struct sfs_inode_info *si = SFS_I(inode);
 
-	return &si->vfs_inode;
+	sfs_inode->i_mode = cpu_to_le16(inode->i_mode);
+	sfs_inode->i_links = cpu_to_le16(inode->i_nlink);
+
+	sfs_inode->i_uid = cpu_to_le32(i_uid_read(inode));
+	sfs_inode->i_gid = cpu_to_le32(i_gid_read(inode));
+
+	sfs_inode->i_size = cpu_to_le64(inode->i_size);
+	sfs_inode->i_atime_nsec = cpu_to_le32(inode->i_atime.tv_sec);
+	sfs_inode->i_ctime_nsec = cpu_to_le32(inode->i_ctime.tv_sec);
+	sfs_inode->i_mtime_nsec = cpu_to_le32(inode->i_mtime.tv_sec);
+	sfs_inode->i_blocks = cpu_to_le32(inode->i_blocks);
+	sfs_inode->i_flags = cpu_to_le32(si->i_flags);
+
+	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode)) {
+		sfs_inode->i_dblock[0] = si->i_data[0];
+	} else if (inode->i_blocks) {
+		memcpy(&sfs_inode->i_dblock, si->i_data, sizeof(sfs_inode->i_dblock));
+	}
+
+	if (!inode->i_nlink)
+		memset(sfs_inode, 0, sizeof(struct sfs_inode));
+}
+
+static sfs_update_inode(struct inode *inode, int do_sync) {
+	struct super_block *sb = inode->i_sb;
+	struct sfs_sb_info *sbi = SFS_SB(sb);
+	struct sfs_inode *sfs_inode;
+	struct buffer_head *bh;
+
+	bh = sb_bread(sb, sfs_inotoba(inode->i_ino));
+
+	sfs_inode = (struct sfs_inode *)bh->b_data;
+
+	sfs_fill_inode(inode, sfs_inode);
+
+	mark_buffer_dirty(bh);
+	if (do_sync)
+		sync_dirty_buffer(bh);
+	brelse(bh);
+
+	return 0;
+}
+
+int sfs_write_inode(struct inode *inode, struct writeback_control *wbc)
+{
+	printk(KERN_ERR "jy: write_inode\n");
+	return sfs_update_inode(inode, wbc->sync_mode == WB_SYNC_ALL);
 }
 
 static const struct super_operations sfs_sops = {
 	.alloc_inode    = sfs_alloc_inode,
-/*
 	.free_inode     = sfs_free_inode,
 	.write_inode    = sfs_write_inode,
+/*
 	.evict_inode    = sfs_evict_inode,
 	.put_super      = sfs_put_super,
 	.sync_fs        = sfs_sync_fs,
@@ -470,49 +597,20 @@ static int read_raw_super_block(struct sfs_sb_info *sbi,
 	return err;
 }
 
-static int sfs_get_inode(struct inode *inode, ino_t ino,
-		struct buffer_head **p)
+static int sfs_read_inode(struct inode *inode, struct sfs_inode *sfs_inode)
 {       
-	struct super_block *sb = inode->i_sb;
-	struct sfs_inode *raw_inode;
-	struct buffer_head * bh;
-	unsigned long block;
-	unsigned long offset;
-	uid_t i_uid;
-	gid_t i_gid;
+	printk(KERN_ERR "jy: read_inode\n");
 
-/*
-	 *p = NULL;
-	 if ((ino != SFS_ROOT_INO && ino < SFS_FIRST_INO(sb)) ||
-	 ino > le32_to_cpu(EXT2_SB(sb)->s_es->s_inodes_count))
-	 goto Einval;
-*/
-
-	offset = (ino - SFS_ROOT_INO);
-	block = SFS_GET_SB(sb, inodes_blkaddr) + offset;
-	if (!(bh = sb_bread(sb, block)))
-		goto Eio;
-
-	*p = bh;
-	raw_inode = (struct sfs_inode *)bh->b_data;
-/*
-Einval:
-	sfs_error(sb, "sfs_get_inode", "bad inode number: %lu",
-			(unsigned long) ino);
-	return ERR_PTR(-EINVAL);
-*/
-	inode->i_mode = le16_to_cpu(raw_inode->i_mode);
-	i_uid = (uid_t)le16_to_cpu(raw_inode->i_uid);
-	i_gid = (gid_t)le16_to_cpu(raw_inode->i_gid);
-	i_uid_write(inode, i_uid);
-	i_gid_write(inode, i_gid);
-	set_nlink(inode, le16_to_cpu(raw_inode->i_links));
-	inode->i_size = le32_to_cpu(raw_inode->i_size);
-	inode->i_atime.tv_sec = (signed)le32_to_cpu(raw_inode->i_atime);
-	inode->i_ctime.tv_sec = (signed)le32_to_cpu(raw_inode->i_ctime);
-	inode->i_mtime.tv_sec = (signed)le32_to_cpu(raw_inode->i_mtime);
+	inode->i_mode = le16_to_cpu(sfs_inode->i_mode);
+	i_uid_write(inode, le32_to_cpu(sfs_inode->i_uid));
+	i_gid_write(inode, le32_to_cpu(sfs_inode->i_gid));
+	set_nlink(inode, le16_to_cpu(sfs_inode->i_links));
+	inode->i_size = le32_to_cpu(sfs_inode->i_size);
+	inode->i_atime.tv_sec = (signed)le32_to_cpu(sfs_inode->i_atime);
+	inode->i_ctime.tv_sec = (signed)le32_to_cpu(sfs_inode->i_ctime);
+	inode->i_mtime.tv_sec = (signed)le32_to_cpu(sfs_inode->i_mtime);
 	inode->i_atime.tv_nsec = inode->i_mtime.tv_nsec = inode->i_ctime.tv_nsec = 0;
-	inode->i_blocks = le32_to_cpu(raw_inode->i_blocks);
+	inode->i_blocks = le32_to_cpu(sfs_inode->i_blocks);
 
 	if (S_ISREG(inode->i_mode)) {
 
@@ -524,20 +622,11 @@ Einval:
 	}
 
 	return 0;
-
-Eio:
-	sfs_msg(sb, KERN_ERR, "sfs_get_inode", "unable to read inode block - inode=%lu, block=%lu",
-				(unsigned long) ino, block);
-	return -EIO;
-
-/*
-Egdp:
-	return ERR_PTR(-EIO);
-*/
 }
 
 static void sfs_set_inode_ops(struct inode *inode)
 {
+	printk(KERN_ERR "jy: set_inode_ops\n");
 	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &sfs_file_inode_operations;
 		inode->i_fop = &sfs_file_operations;
@@ -551,10 +640,12 @@ static void sfs_set_inode_ops(struct inode *inode)
 
 struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
 {
+	struct sfs_inode *sfs_inode;
 	struct buffer_head *bh;
 	struct inode *inode;
 	int err;
 
+	printk(KERN_ERR "jy: iget %ld\n", ino);
 	inode = iget_locked(sb, ino);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
@@ -563,7 +654,14 @@ struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
 
 	inode->i_sb = sb;
 
-	err = sfs_get_inode(inode, ino, &bh);
+	bh = sb_bread(sb, sfs_inotoba(ino));
+	printk(KERN_ERR "jy: iget0 %ld\n", sfs_inotoba(ino));
+	if (!bh) {
+		sfs_msg(sb, "Failed to read inode %d\n", ino);
+		goto bad_inode;
+	}
+	sfs_inode = (struct sfs_inode *)bh->b_data;
+	err = sfs_read_inode(inode, sfs_inode);
 	brelse(bh);
 	if (err)
 		goto bad_inode;
@@ -588,6 +686,7 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 	int ret;
 	int i;
 
+	printk(KERN_ERR "jy: fill_super\n");
 	raw_super = NULL;
 
 	sbi = kzalloc(sizeof(struct sfs_sb_info), GFP_KERNEL);
@@ -602,6 +701,7 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto free_sbi;
 	}
 
+	printk(KERN_ERR "jy: fill_super0\n");
 	ret = read_raw_super_block(sbi, &raw_super, &valid_super_block);
 	if (ret) {
 		sfs_msg(sb, KERN_ERR, "Failed to read superblock");
@@ -617,16 +717,21 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_op = &sfs_sops;
 	sb->s_magic = le64_to_cpu(raw_super->magic);	
 
+	sbi->inode_blkaddr = le32_to_cpu(raw_super->inodes_blkaddr);
+
+	printk(KERN_ERR "jy: fill_super1\n");
 	root = sfs_iget(sb, SFS_ROOT_INO);
 	if (IS_ERR(root)) {
 		ret = PTR_ERR(root);
 		goto free_raw_super;
 	}
+	printk(KERN_ERR "jy: fill_super2\n");
 	sb->s_root = d_make_root(root);
 	if (!sb->s_root) {
 		ret = -ENOMEM;
 		goto free_raw_super;
 	}
+	printk(KERN_ERR "jy: fill_super3\n");
 
 	return 0;
 
@@ -639,6 +744,7 @@ free_sbi:
 	return ret;
 
 failed_nomem:
+	printk(KERN_ERR "jy: fill_super4\n");
 	sfs_msg(sb, KERN_ERR, "ENOMEM");
 	return -ENOMEM;
 }
@@ -663,14 +769,17 @@ static int __init init_sfs_fs(void)
 
 	err = init_inode_cache();
 	if (err)
-		return err;
+		goto out1;
 	err = register_filesystem(&sfs_fs_type);
 	if (err)
-		goto fail;
+		goto out;
 	
 	return 0;
 
-fail:
+out:
+	destroy_inode_cache();
+
+out1:
 	return err;
 }
 

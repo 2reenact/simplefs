@@ -25,10 +25,10 @@ struct sfs_sb_info {
 	struct super_block *sb;				/* pointer to VFS super block */
 	struct sfs_super_block *raw_super;		/* raw super block pointer */
 
+	unsigned int inode_blkaddr;
+
 	spinlock_t s_lock;
 };
-
-#define SFS_ROOT_INO		 2	/* Root inode */
 
 /*
  * Macro-instructions used to manage several block sizes
@@ -57,6 +57,10 @@ static inline struct sfs_sb_info *SFS_SB(struct super_block *sb)
 }
 
 #define SFS_GET_SB(s, i)		(SFS_SB(s)->raw_super->i)
+
+#define SFS_ROOT_INO		 2	/* Root inode */
+#define sfs_inotoba(x)			(((struct sfs_sb_info *)(sb->s_fs_info))->inode_blkaddr + x - SFS_ROOT_INO)
+
 
 
 #endif /* _SFS_H */
