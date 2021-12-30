@@ -107,9 +107,9 @@ static inline u_int64_t bswap_64(u_int64_t val)
 
 #define typecheck(type,x) \
 	({	type __dummy; \
-		typeof(x) __dummy2; \
-		(void)(&__dummy == &__dummy2); \
-		1; \
+	 typeof(x) __dummy2; \
+	 (void)(&__dummy == &__dummy2); \
+	 1; \
 	 })
 
 /*
@@ -153,7 +153,7 @@ static inline u_int64_t bswap_64(u_int64_t val)
 	do {								\
 		if (c.dbg_lv >= n) {					\
 			printf("[%s:%4d] " fmt,				\
-				__func__, __LINE__, ##__VA_ARGS__);	\
+					__func__, __LINE__, ##__VA_ARGS__);	\
 		}							\
 	} while (0)
 
@@ -197,25 +197,25 @@ struct sfs_configuration {
 #define get_sb_le16(member)			le16_to_cpu(sb->member)
 
 #define set_sb(member, val)						 \
-			do {						 \
-				typeof(sb->member) t;			 \
-				switch (sizeof(t)) {			 \
-				case 8: set_sb_le64(member, val); break; \
-				case 4: set_sb_le32(member, val); break; \
-				case 2: set_sb_le16(member, val); break; \
-				}					 \
-			} while(0)
+	do {						 \
+		typeof(sb->member) t;			 \
+		switch (sizeof(t)) {			 \
+			case 8: set_sb_le64(member, val); break; \
+			case 4: set_sb_le32(member, val); break; \
+			case 2: set_sb_le16(member, val); break; \
+		}					 \
+	} while(0)
 
 #define get_sb(member)							\
-			({						\
-				typeof(sb->member) t;			\
-				switch (sizeof(t)) {			\
-				case 8: t = get_sb_le64(member); break; \
-				case 4: t = get_sb_le32(member); break; \
-				case 2: t = get_sb_le16(member); break; \
-				} 					\
-				t;					\
-			})
+	({						\
+	 typeof(sb->member) t;			\
+	 switch (sizeof(t)) {			\
+	 case 8: t = get_sb_le64(member); break; \
+	 case 4: t = get_sb_le32(member); break; \
+	 case 2: t = get_sb_le16(member); break; \
+	 } 					\
+	 t;					\
+	 })
 
 /*
  * Copied from include/linux/kernel.h
@@ -224,16 +224,16 @@ struct sfs_configuration {
 #define round_down(x, y)	((x) & ~__round_mask(x, y))
 
 #define min(x, y) ({				\
-	typeof(x) _min1 = (x);			\
-	typeof(y) _min2 = (y);			\
-	(void) (&_min1 == &_min2);		\
-	_min1 < _min2 ? _min1 : _min2; })
+		typeof(x) _min1 = (x);			\
+		typeof(y) _min2 = (y);			\
+		(void) (&_min1 == &_min2);		\
+		_min1 < _min2 ? _min1 : _min2; })
 
 #define max(x, y) ({				\
-	typeof(x) _max1 = (x);			\
-	typeof(y) _max2 = (y);			\
-	(void) (&_max1 == &_max2);		\
-	_max1 > _max2 ? _max1 : _max2; })
+		typeof(x) _max1 = (x);			\
+		typeof(y) _max2 = (y);			\
+		(void) (&_max1 == &_max2);		\
+		_max1 > _max2 ? _max1 : _max2; })
 
 #define SFS_SUPER_OFFSET		1024	/* byte-size offset */
 #define	DEFAULT_SECTOR_SIZE		512	/* sector size is 512 bytes */
@@ -246,24 +246,24 @@ struct sfs_configuration {
 #define NULL_ADDR		0x0U
 #define NEW_ADDR		-1U
 
-#define SFS_ROOT_INO(sbi)	(sbi->root_ino_num)
+#define SFS_ROOT_INO		3
 
 struct sfs_super_block {
-        __le32 magic;                   /* Magic Number */
-        __le32 sector_size;		/* sector size in bytes */
-        __le32 sectors_per_block;       /* # of sectors per block */
-        __le32 block_size;		/* block size in bytes */
-        __le64 block_count;             /* total # of user blocks */
+	__le32 magic;                   /* Magic Number */
+	__le32 sector_size;		/* sector size in bytes */
+	__le32 sectors_per_block;       /* # of sectors per block */
+	__le32 block_size;		/* block size in bytes */
+	__le64 block_count;             /* total # of user blocks */
 	__le32 start_block_addr;	/* block 0 byte address  */
-        __le32 imap_blkaddr;            /* start block address of inode bmap */
-        __le32 dmap_blkaddr;            /* start block address of data bmap */
-        __le32 inodes_blkaddr;          /* start block address of inodes */
-        __le32 data_blkaddr;            /* start block address of data */
-        __le32 block_count_imap;        /* # of blocks for inode bmap */
-        __le32 block_count_dmap;        /* # of blocks for data bmap */
-        __le32 block_count_inodes;      /* # of blocks for inode */
-        __le32 block_count_data;        /* # of blocks for data */
-        __le32 root_addr;               /* root inode blkaddr */
+	__le32 imap_blkaddr;            /* start block address of inode bmap */
+	__le32 dmap_blkaddr;            /* start block address of data bmap */
+	__le32 inodes_blkaddr;          /* start block address of inodes */
+	__le32 data_blkaddr;            /* start block address of data */
+	__le32 block_count_imap;        /* # of blocks for inode bmap */
+	__le32 block_count_dmap;        /* # of blocks for data bmap */
+	__le32 block_count_inodes;      /* # of blocks for inode */
+	__le32 block_count_data;        /* # of blocks for data */
+	__le32 root_addr;               /* root inode blkaddr */
 	char path[MAX_PATH_LEN];
 } __attribute__((packed));
 
@@ -275,32 +275,32 @@ struct sfs_super_block {
 #define SFS_NAME_LEN_BITS	3
 
 struct sfs_inode {
-        __le16 i_mode;                  /* file mode */
-        __u8 i_advise;                  /* file hints */
-        __u8 i_inline;                  /* file inline flags */
-        __le32 i_uid;                   /* user ID */
-        __le32 i_gid;                   /* group ID */
-        __le32 i_links;                 /* links count */
-        __le64 i_size;                  /* file size in bytes */
-        __le64 i_blocks;                /* file size in blocks */
-        __le64 i_atime;                 /* access time */
-        __le64 i_ctime;                 /* creation time */
-        __le64 i_mtime;                 /* modification time */
-        __le32 i_atime_nsec;            /* access time in nano scale */
-        __le32 i_ctime_nsec;            /* creation time in nano scale */
-        __le32 i_mtime_nsec;            /* modification time in nano scale */
-        __le32 i_flags;                 /* file attributes */
-        __le32 i_pino;                  /* parent inode number */
-        __le32 i_namelen;               /* file name length */
-        __u8 i_name[SFS_NAME_LEN];      /* file name for SPOR */
+	__le16 i_mode;                  /* file mode */
+	__u8 i_advise;                  /* file hints */
+	__u8 i_inline;                  /* file inline flags */
+	__le32 i_uid;                   /* user ID */
+	__le32 i_gid;                   /* group ID */
+	__le32 i_links;                 /* links count */
+	__le64 i_size;                  /* file size in bytes */
+	__le64 i_blocks;                /* file size in blocks */
+	__le64 i_atime;                 /* access time */
+	__le64 i_ctime;                 /* creation time */
+	__le64 i_mtime;                 /* modification time */
+	__le32 i_atime_nsec;            /* access time in nano scale */
+	__le32 i_ctime_nsec;            /* creation time in nano scale */
+	__le32 i_mtime_nsec;            /* modification time in nano scale */
+	__le32 i_flags;                 /* file attributes */
+	__le32 i_pino;                  /* parent inode number */
+	__le32 i_namelen;               /* file name length */
+	__u8 i_name[SFS_NAME_LEN];      /* file name for SPOR */
 
-        __le32 d_addr[DEF_ADDRS_PER_INODE];     /* Pointers to data blocks */
-        __le32 i_addr[DEF_NIDS_PER_INODE];      /* indirect, double indirect,
-                                                triple_indirect block address*/
+	__le32 d_addr[DEF_ADDRS_PER_INODE];     /* Pointers to data blocks */
+	__le32 i_addr[DEF_NIDS_PER_INODE];      /* indirect, double indirect,
+						   triple_indirect block address*/
 } __attribute__((packed));
 
 struct indirect_node {
-        __le32 addr[DEF_ADDRS_PER_BLOCK];       /* array of data block address */
+	__le32 addr[DEF_ADDRS_PER_BLOCK];       /* array of data block address */
 } __attribute__((packed));
 
 /* the number of dentry in a block */
@@ -309,31 +309,30 @@ struct indirect_node {
 /*  */
 #define SIZE_OF_DIR_ENTRY	8       /* by byte */
 #define SIZE_OF_DENTRY_BITMAP   ((DENTRY_IN_BLOCK + BITS_PER_BYTE - 1) / \
-                                        BITS_PER_BYTE)
+		BITS_PER_BYTE)
 #define SIZE_OF_RESERVED        (PAGE_SIZE - ((SIZE_OF_DIR_ENTRY + \
-                                SFS_SLOT_LEN) * \
-                                DENTRY_IN_BLOCK + SIZE_OF_DENTRY_BITMAP))
+				SFS_SLOT_LEN) * \
+				DENTRY_IN_BLOCK + SIZE_OF_DENTRY_BITMAP))
 
 struct sfs_dir_entry {
-        __le32 file_type;               /* file type */
-        __le32 i_no;			/* inode number */
-        __le32 i_addr;                  /* inode address */
-        __u8 filename[SFS_NAME_LEN];    /* file name */
+	__u8 file_type;               /* file type */
+	__le32 i_no;			/* inode number */
+	__u8 filename[SFS_NAME_LEN];    /* file name */
 } __attribute__((packed));
 
 /* 4KB-sized directory entry block */
 struct sfs_dentry_block {
 	__u8 dentry_bitmap[SIZE_OF_DENTRY_BITMAP];
-//	__u8 reserved[SIZE_OF_RESERVED];
-        struct sfs_dir_entry dentry[DENTRY_IN_BLOCK];
+	//	__u8 reserved[SIZE_OF_RESERVED];
+	struct sfs_dir_entry dentry[DENTRY_IN_BLOCK];
 } __attribute__((packed));
 
 /* file types used in inode_info->flags */
 enum {
-        SFS_UNKNOWN,
-        SFS_REG_FILE,
-        SFS_DIR,
-        SFS_SYMLINK
+	SFS_UNKNOWN,
+	SFS_REG_FILE,
+	SFS_DIR,
+	SFS_SYMLINK
 };
 
 #define SFS_IMAP_BLK_OFFSET		2	/* imap block offset is 1 */

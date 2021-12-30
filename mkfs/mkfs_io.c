@@ -67,7 +67,7 @@ int dev_write_block(void *buf, __u64 blk_addr)
 	return dev_write(buf, blk_addr << SFS_BLKSIZE_BITS, SFS_BLKSIZE);
 }
 
-int write_inode(struct sfs_node *inode, u64 blkaddr)
+int write_inode(struct sfs_node *inode, __u64 blkaddr)
 {
 	return dev_write_block(inode, blkaddr);
 }

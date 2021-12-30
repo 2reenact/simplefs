@@ -83,7 +83,7 @@ struct sfs_configuration {
 #define NULL_ADDR		0x0U
 #define NEW_ADDR		-1U
 
-//#define SFS_ROOT_INO(sbi)	(sbi->root_ino_num)
+#define SFS_ROOT_INO		 3	/* Root inode */
 
 struct sfs_super_block {
         __le32 magic;                   /* Magic Number */
@@ -148,7 +148,7 @@ struct indirect_node {
 #define DENTRY_IN_BLOCK		256
 
 /*  */
-#define SIZE_OF_DIR_ENTRY	8       /* by byte */
+#define SFS_REC_LEN		13 /* by byte */
 #define SIZE_OF_DENTRY_BITMAP   ((DENTRY_IN_BLOCK + BITS_PER_BYTE - 1) / \
                                         BITS_PER_BYTE)
 #define SIZE_OF_RESERVED        (PAGE_SIZE - ((SIZE_OF_DIR_ENTRY + \
@@ -156,9 +156,8 @@ struct indirect_node {
                                 DENTRY_IN_BLOCK + SIZE_OF_DENTRY_BITMAP))
 
 struct sfs_dir_entry {
-        __le32 file_type;               /* file type */
+        __u8 file_type;               /* file type */
         __le32 i_no;                    /* inode number */
-        __le32 i_addr;                  /* inode address */
         __u8 filename[SFS_NAME_LEN];    /* file name */
 } __attribute__((packed));
 
@@ -177,7 +176,8 @@ enum {
         SFS_SYMLINK
 };
 
-#define SFS_REC_LEN			(sizeof(struct sfs_dir_entry))
+#define SFS_DENTRY_OFFSET		32
+
 #define SFS_IMAP_BLK_OFFSET		2	/* imap block offset is 1 */
 #define SFS_IMAP_BYTE_OFFSET		4096	/* imap byte offset is 4096 */
 #define MAP_SIZE_ALIGN(size)		((size) + SFS_BLKSIZE) / SFS_BLKSIZE

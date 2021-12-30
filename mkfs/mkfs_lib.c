@@ -69,7 +69,7 @@ int get_bits_in_byte(unsigned char n)
 	return bits_in_byte[n];
 }
 
-int test_and_set_bit_le(u32 nr, u8 *addr)
+int test_and_set_bit_le(__u32 nr, __u8 *addr)
 {
 	int mask, retval;
 
@@ -80,7 +80,7 @@ int test_and_set_bit_le(u32 nr, u8 *addr)
 	return retval;
 }
 
-int test_and_clear_bit_le(u32 nr, u8 *addr)
+int test_and_clear_bit_le(__u32 nr, __u8 *addr)
 {
 	int mask, retval;
 
@@ -91,7 +91,7 @@ int test_and_clear_bit_le(u32 nr, u8 *addr)
 	return retval;
 }
 
-int test_bit_le(u32 nr, const u8 *addr)
+int test_bit_le(__u32 nr, const __u8 *addr)
 {
 	return ((1 << (nr & 7)) & (addr[nr >> 3]));
 }
@@ -130,7 +130,7 @@ int sfs_clear_bit(unsigned int nr, char *addr)
 	return ret;
 }
 
-static inline u64 __ffs(u8 word)
+static inline __u64 __ffs(__u8 word)
 {
 	int num = 0;
 
@@ -150,9 +150,9 @@ static inline u64 __ffs(u8 word)
 /* Copied from linux/lib/find_bit.c */
 #define BITMAP_FIRST_BYTE_MASK(start) (0xff << ((start) & (BITS_PER_BYTE - 1)))
 
-static u64 _find_next_bit_le(const u8 *addr, u64 nbits, u64 start, char invert)
+static __u64 _find_next_bit_le(const __u8 *addr, __u64 nbits, __u64 start, char invert)
 {
-	u8 tmp;
+	__u8 tmp;
 
 	if (!nbits || start >= nbits)
 		return nbits;
@@ -174,13 +174,13 @@ static u64 _find_next_bit_le(const u8 *addr, u64 nbits, u64 start, char invert)
 	return min(start + __ffs(tmp), nbits);
 }
 
-u64 find_next_bit_le(const u8 *addr, u64 size, u64 offset)
+__u64 find_next_bit_le(const __u8 *addr, __u64 size, __u64 offset)
 {
 	return _find_next_bit_le(addr, size, offset, 0);
 }
 
 
-u64 find_next_zero_bit_le(const u8 *addr, u64 size, u64 offset)
+__u64 find_next_zero_bit_le(const __u8 *addr, __u64 size, __u64 offset)
 {
 	return _find_next_bit_le(addr, size, offset, 0xff);
 }
