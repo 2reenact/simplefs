@@ -110,9 +110,10 @@ static inline void sfs_put_page(struct page *page)
 static struct page *sfs_get_page(struct inode *dir, unsigned long n)
 {
 	struct address_space *mapping = dir->i_mapping;
-	struct page *page = read_mapping_page(mapping, n, NULL);
+	struct page *page;
 
-	printk(KERN_ERR "jy: get_page\n");
+	printk(KERN_ERR "jy: get_page ino %ld n %d\n", dir->i_ino, n);
+ 	page = read_mapping_page(mapping, 2, NULL);
 	if (!IS_ERR(page)) {
 		kmap(page);
 		if (unlikely(!PageChecked(page))) {
