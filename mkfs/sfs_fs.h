@@ -271,8 +271,7 @@ struct sfs_super_block {
 #define DEF_NIDS_PER_INODE      3       /* Node IDs in an Inode */
 #define DEF_ADDRS_PER_BLOCK     1024    /* Address Pointers in a Indirect Block */
 
-#define SFS_NAME_LEN		8
-#define SFS_NAME_LEN_BITS	3
+#define SFS_NAME_LEN		255
 
 struct sfs_inode {
 	__le16 i_mode;                  /* file mode */
@@ -291,11 +290,9 @@ struct sfs_inode {
 	__le32 i_mtime_nsec;            /* modification time in nano scale */
 	__le32 i_flags;                 /* file attributes */
 	__le32 i_pino;                  /* parent inode number */
-	__le32 i_namelen;               /* file name length */
-	__u8 i_name[SFS_NAME_LEN];      /* file name for SPOR */
 
-	__le32 d_addr[DEF_ADDRS_PER_INODE];     /* Pointers to data blocks */
-	__le32 i_addr[DEF_NIDS_PER_INODE];      /* indirect, double indirect,
+	__le32 i_daddr[DEF_ADDRS_PER_INODE];     /* Pointers to data blocks */
+	__le32 i_iaddr[DEF_NIDS_PER_INODE];      /* indirect, double indirect,
 						   triple_indirect block address*/
 } __attribute__((packed));
 
@@ -303,28 +300,22 @@ struct indirect_node {
 	__le32 addr[DEF_ADDRS_PER_BLOCK];       /* array of data block address */
 } __attribute__((packed));
 
-/* the number of dentry in a block */
-#define DENTRY_IN_BLOCK		256
-
-/*  */
-#define SIZE_OF_DIR_ENTRY	8       /* by byte */
-#define SIZE_OF_DENTRY_BITMAP   ((DENTRY_IN_BLOCK + BITS_PER_BYTE - 1) / \
-		BITS_PER_BYTE)
-#define SIZE_OF_RESERVED        (PAGE_SIZE - ((SIZE_OF_DIR_ENTRY + \
-				SFS_SLOT_LEN) * \
-				DENTRY_IN_BLOCK + SIZE_OF_DENTRY_BITMAP))
-
 struct sfs_dir_entry {
+	__le32 inode;
+	__le16 rec_len;
+	__u8 name_len;
 	__u8 file_type;               /* file type */
-	__le32 i_no;			/* inode number */
-	__u8 filename[SFS_NAME_LEN];    /* file name */
+	__u8 name[SFS_NAME_LEN];    /* file name */
 } __attribute__((packed));
+
+#define SFS_DIR_PAD			4
+#define SFS_DIR_ROUND			(SFS_DIR_PAD - 1)
+#define SFS_DIR_REC_LEN(name_len)	(((name_len) + 8 + SFS_DIR_ROUND) & ~SFS_DIR_ROUND)
+#define SFS_MAX_REC_LEN			((1<<16) - 1)
 
 /* 4KB-sized directory entry block */
 struct sfs_dentry_block {
-	__u8 dentry_bitmap[SIZE_OF_DENTRY_BITMAP];
-	//	__u8 reserved[SIZE_OF_RESERVED];
-	struct sfs_dir_entry dentry[DENTRY_IN_BLOCK];
+	struct sfs_dir_entry dentry[255];
 } __attribute__((packed));
 
 /* file types used in inode_info->flags */
@@ -332,7 +323,6 @@ enum {
 	SFS_UNKNOWN,
 	SFS_REG_FILE,
 	SFS_DIR,
-	SFS_SYMLINK
 };
 
 #define SFS_IMAP_BLK_OFFSET		2	/* imap block offset is 1 */

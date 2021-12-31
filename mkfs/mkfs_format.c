@@ -144,31 +144,37 @@ static int trim_device(void)
 
 static int sfs_add_default_dentry_root(void)
 {
-	struct sfs_dentry_block *dent_blk = NULL;
 	u_int64_t data_blk_offset = 0;
+	struct sfs_dir_entry dentry;
+	char *dent_blk = NULL;
+	int rec_len = 0;
 
 	dent_blk = calloc(SFS_BLKSIZE, 1);
 	if (dent_blk == NULL) {
 		MSG(1, "\tError: Calloc Failed for dent_blk!!!\n");
 		return -1;
 	}
-//modify later !!! name_len should be inode number	
-	dent_blk->dentry[0].file_type = 0666;
-	dent_blk->dentry[0].i_no = SFS_ROOT_INO;
-	memcpy(dent_blk->dentry[0].filename, ".", 1);
 
-	dent_blk->dentry[1].file_type = 0666;
-	dent_blk->dentry[1].i_no = SFS_ROOT_INO;
-	memcpy(dent_blk->dentry[1].filename, "..", 2);
+	rec_len = SFS_DIR_REC_LEN(1);
 
-	test_and_set_bit_le(0, dent_blk->dentry_bitmap);
-	test_and_set_bit_le(1, dent_blk->dentry_bitmap);
+	memset(&dentry, 0, rec_len);
+	dentry.file_type = 0666;
+	dentry.inode = SFS_ROOT_INO;
+	dentry.name_len = 1;
+	dentry.rec_len = rec_len;
+	memcpy(dentry.name, ".", 1);
+	memcpy(dent_blk, &dentry, rec_len);
+
+	memset(&dentry, 0, rec_len);
+	dentry.file_type = 0666;
+	dentry.inode = SFS_ROOT_INO;
+	dentry.name_len = 1;
+	dentry.rec_len = 4096 - rec_len;
+	memcpy(dentry.name, "..", 2);
+	memcpy(dent_blk + rec_len, &dentry, rec_len);
 
 	data_blk_offset = get_sb(data_blkaddr);
-/*
-	DBG(1, "\tWriting default dentry root, at offset 0x%08"PRIx64"\n",
-			 data_blk_offset);
-*/
+
 	if (dev_write_block(dent_blk, data_blk_offset)) {
 		MSG(1, "\tError: While writing the dentry_blk to disk!!!\n");
 		free(dent_blk);
@@ -197,7 +203,7 @@ static int sfs_write_root_inode(void)
 	block_size_byte = 1 << get_sb(block_size);
 	raw_node->i_size = cpu_to_le64(1 * block_size_byte);
 	raw_node->i_blocks = cpu_to_le64(1);
-	raw_node->d_addr[0] = get_sb(data_blkaddr);
+	raw_node->i_daddr[0] = get_sb(data_blkaddr);
 
 	raw_node->i_atime = cpu_to_le64(time(NULL));
 	raw_node->i_atime_nsec = 0;

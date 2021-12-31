@@ -241,11 +241,18 @@ static unsigned sfs_last_byte(struct inode *inode, unsigned long page_nr)
 	return last_byte;
 }
 
-static inline int sfs_match(struct super_block *sb, const unsigned char *name, struct sfs_dir_entry *de)
+static inline int sfs_match(int len, const unsigned char *name, struct sfs_dir_entry *de)
 {
-	if (!de->i_no)
+	if (len != de->name_len)
 		return 0;
-	return !memcmp(name, de->filename, SFS_NAME_LEN);
+	if (!de->inode)
+		return 0;
+	return !memcmp(name, de->name, len);
+}
+
+static inline struct sfs_dir_entry *sfs_next_entry(struct sfs_dir_entry *p)
+{
+	return (struct sfs_dir_entry *)((char *)p + le16_to_cpu(p->rec_len));
 }
 
 struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr, struct page **res_page)
@@ -253,6 +260,7 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 	struct super_block *sb = dir->i_sb;
 	const unsigned char *name = qstr->name;
 	int namelen = qstr->len;
+	unsigned reclen = SFS_DIR_REC_LEN(namelen);
 	unsigned long start, n;
 	unsigned long npages = dir_pages(dir);
 	struct page *page = NULL;
@@ -260,13 +268,16 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 	struct sfs_dir_entry *de;
 
 	printk(KERN_ERR "jy: find_entry %s, %ld\n", name, dir->i_ino);
+
+	if (npages == 0 || namelen > SFS_MAXNAME_LEN)
+		goto out;
+
 	*res_page = NULL;
 
 	start = si->i_dir_start_lookup;
 
 	if (start >= npages)
 		start = 0;
-
 	n = start;
 	do {
 		char *kaddr;
@@ -274,14 +285,17 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 		if (!IS_ERR(page)) {
 			kaddr = page_address(page);
 			de = (struct sfs_dir_entry *)(kaddr + SFS_DENTRY_OFFSET);
-			kaddr += sfs_last_byte(dir, n) - SFS_REC_LEN;
+			kaddr += sfs_last_byte(dir, n) - reclen;
 			while ((char *) de <= kaddr) {
-				if (!strcmp(de->filename, ""))
+				if (de->rec_len == 0) {
+					sfs_msg(sb, KERN_ERR, "zero-length diretory entry");
+					sfs_put_page(page);
 					goto out;
-				printk(KERN_ERR "jy: find_entry4: %d %s\n", de->i_no, de->filename);
-				if (sfs_match(sb, name, de))
+				}
+				printk(KERN_ERR "jy: find_entry4: %d %s\n", de->inode, de->name);
+				if (sfs_match(namelen, name, de))
 					goto found;
-				de++;
+				de = sfs_next_entry(de);
 			}
 			sfs_put_page(page);
 		}
@@ -310,7 +324,7 @@ ino_t sfs_inode_by_name(struct inode *dir, const struct qstr *qstr)
 	de = sfs_find_entry(dir, qstr, &page);
 	if (de) {
 		printk(KERN_ERR "jy: inode_by_name0\n");
-		ret = le32_to_cpu(de->i_no);
+		ret = le32_to_cpu(de->inode);
 		sfs_put_page(page);
 	}
 	printk(KERN_ERR "jy: inode_by_name1\n");
@@ -325,7 +339,7 @@ static struct dentry *sfs_lookup(struct inode *dir, struct dentry *dentry, unsig
 	char *name = kzalloc(20, GFP_KERNEL);
 	memcpy(name, dentry->d_name.name, dentry->d_name.len);
 	printk(KERN_ERR "jy: lookup:%s(%d)\n", name, dentry->d_name.len);
-	if (dentry->d_name.len > SFS_NAME_LEN)
+	if (dentry->d_name.len > SFS_MAXNAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
 	printk(KERN_ERR "jy: lookup0");
@@ -413,7 +427,8 @@ static int sfs_readdir(struct file *file, struct dir_context *ctx)
 
 	printk(KERN_ERR "jy: readdir:%s %ld %ld %lld\n",
 			file->f_path.dentry->d_name.name, file->f_inode->i_ino, npages, pos);
-	if (pos > inode->i_size - SFS_REC_LEN)
+
+	if (pos > inode->i_size - SFS_DIR_REC_LEN(1))
 		return 0;
 
 	for ( ; n < npages; n++, offset = 0) {
@@ -427,37 +442,38 @@ static int sfs_readdir(struct file *file, struct dir_context *ctx)
 			ctx->pos += PAGE_SIZE - offset;
 			return -EIO;
 		}
-		//printk(KERN_ERR "jy: readdir1\n");
+		printk(KERN_ERR "jy: readdir1\n");
 		kaddr = page_address(page);
 		if (need_revalidate) {
 			if (offset) {
-				offset; 
-				ctx->pos = (n << PAGE_SHIFT) + offset;
+				printk(KERN_ERR "jy: readdir1.5\n");
 				//jy
+				ctx->pos = (n << PAGE_SHIFT) + offset;
 			}
+			file->f_version = inode_query_iversion(inode);
+			need_revalidate = false;
 		}
-		//de = (struct sfs_dir_entry *)(kaddr + offset);
-		de = (struct sfs_dir_entry *)(kaddr + 32);
-		limit = kaddr + sfs_last_byte(inode, n) - SFS_REC_LEN;
-		for ( ; (char *)de <= limit; de++) {
-			if (!strcmp(de->filename, "")) {
+		de = (struct sfs_dir_entry *)(kaddr + offset);
+		limit = kaddr + sfs_last_byte(inode, n) - SFS_DIR_REC_LEN(1);
+		for ( ; (char *)de <= limit; de = sfs_next_entry(de)) {
+			if (de->rec_len == 0) {
+				sfs_msg(sb, KERN_ERR, "zero-length diretory entry");
 				sfs_put_page(page);
-				ctx->pos += sfs_last_byte(inode, n);
 				return -EIO;
 			}
-			//printk(KERN_ERR "jy: readdir2: %d %s\n", de->i_no, de->filename);
-			if (de->i_no) {
+			printk(KERN_ERR "jy: readdir2: %d %s\n", de->inode, de->name);
+			if (de->inode) {
 				unsigned char d_type = DT_UNKNOWN;
 
 				d_type = fs_ftype_to_dtype(de->file_type);
-				if (!dir_emit(ctx, de->filename, SFS_NAME_LEN,
-						le32_to_cpu(de->i_no),
+				if (!dir_emit(ctx, de->name, de->name_len,
+						le32_to_cpu(de->inode),
 						d_type)) {
 					sfs_put_page(page);
 					return 0;
 				}
 			}
-			ctx->pos += SFS_REC_LEN;
+			ctx->pos += le16_to_cpu(de->rec_len);
 		}
 		sfs_put_page(page);
 	}
@@ -529,9 +545,9 @@ static void sfs_fill_inode(struct inode *inode, struct sfs_inode *sfs_inode)
 	sfs_inode->i_flags = cpu_to_le32(si->i_flags);
 
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode)) {
-		sfs_inode->i_dblock[0] = si->i_data[0];
+		sfs_inode->i_daddr[0] = si->i_data[0];
 	} else if (inode->i_blocks) {
-		memcpy(&sfs_inode->i_dblock, si->i_data, sizeof(sfs_inode->i_dblock));
+		memcpy(&sfs_inode->i_daddr, si->i_data, sizeof(sfs_inode->i_daddr));
 	}
 
 	if (!inode->i_nlink)
