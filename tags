@@ -26,14 +26,12 @@ DEF_ADDRS_PER_INODE	sfs_fs.h	107;"	d
 DEF_IDPS_PER_INODE	sfs_fs.h	108;"	d
 DEF_NIDS_PER_INODE	mkfs/sfs_fs.h	271;"	d
 DEF_SFS_N_BLOCKS	sfs_fs.h	109;"	d
-DENTRY_IN_BLOCK	mkfs/sfs_fs.h	307;"	d
-DENTRY_IN_BLOCK	sfs_fs.h	148;"	d
 DEPS	mkfs/Makefile	/^DEPS = sfs_fs.h mkfs.h$/;"	m
 ERR_MSG	mkfs/sfs_fs.h	140;"	d
 FIX_MSG	mkfs/sfs_fs.h	118;"	d
 KDIR	Makefile	/^KDIR	= \/lib\/modules\/$(shell uname -r)\/build$/;"	m
-MAP_SIZE_ALIGN	mkfs/sfs_fs.h	340;"	d
-MAP_SIZE_ALIGN	sfs_fs.h	183;"	d
+MAP_SIZE_ALIGN	mkfs/sfs_fs.h	330;"	d
+MAP_SIZE_ALIGN	sfs_fs.h	166;"	d
 MAX_PATH_LEN	mkfs/sfs_fs.h	167;"	d
 MAX_PATH_LEN	sfs_fs.h	22;"	d
 MOUNTED	mkfs/mkfs_lib.c	298;"	d	file:
@@ -49,6 +47,7 @@ PAGE_CACHE_SIZE	sfs_fs.h	19;"	d
 PAGE_SIZE	mkfs/sfs_fs.h	162;"	d
 PAGE_SIZE	sfs_fs.h	17;"	d
 PWD	Makefile	/^PWD	= $(shell pwd)$/;"	m
+SBH_MAX_BH	sfs.h	82;"	d
 SFS_BLKSIZE	mkfs/sfs_fs.h	241;"	d
 SFS_BLKSIZE	sfs_fs.h	78;"	d
 SFS_BLKSIZE_BITS	mkfs/sfs_fs.h	170;"	d
@@ -56,29 +55,35 @@ SFS_BLKSIZE_BITS	sfs_fs.h	25;"	d
 SFS_BLOCK_ALIGN	mkfs/sfs_fs.h	244;"	d
 SFS_BLOCK_ALIGN	sfs_fs.h	81;"	d
 SFS_BLOCK_SIZE	mkfs/sfs_fs.h	243;"	d
-SFS_BLOCK_SIZE	sfs.h	36;"	d
-SFS_BLOCK_SIZE_BITS	sfs.h	37;"	d
+SFS_BLOCK_SIZE	sfs.h	47;"	d
+SFS_BLOCK_SIZE_BITS	sfs.h	48;"	d
 SFS_BYTES_TO_BLK	mkfs/sfs_fs.h	169;"	d
 SFS_BYTES_TO_BLK	sfs_fs.h	24;"	d
-SFS_DENTRY_OFFSET	sfs_fs.h	179;"	d
+SFS_DENTRY_OFFSET	sfs_fs.h	162;"	d
 SFS_DIR	mkfs/sfs_fs.h	/^	SFS_DIR,$/;"	e	enum:__anon2
 SFS_DIR	sfs_fs.h	/^        SFS_DIR,$/;"	e	enum:__anon1
-SFS_GET_SB	sfs.h	59;"	d
+SFS_DIR_PAD	mkfs/sfs_fs.h	311;"	d
+SFS_DIR_PAD	sfs_fs.h	150;"	d
+SFS_DIR_REC_LEN	mkfs/sfs_fs.h	313;"	d
+SFS_DIR_REC_LEN	sfs_fs.h	152;"	d
+SFS_DIR_ROUND	mkfs/sfs_fs.h	312;"	d
+SFS_DIR_ROUND	sfs_fs.h	151;"	d
+SFS_DM_I	sfs.h	/^static inline struct sfs_bmap_info *SFS_DM_I(struct sfs_sb_info *sbi)$/;"	f
+SFS_GET_SB	sfs.h	42;"	d
 SFS_I	sfs.h	/^static inline struct sfs_inode_info *SFS_I(struct inode *inode)$/;"	f
-SFS_IMAP_BLK_OFFSET	mkfs/sfs_fs.h	338;"	d
-SFS_IMAP_BLK_OFFSET	sfs_fs.h	181;"	d
-SFS_IMAP_BYTE_OFFSET	mkfs/sfs_fs.h	339;"	d
-SFS_IMAP_BYTE_OFFSET	sfs_fs.h	182;"	d
-SFS_INODE_SIZE	sfs.h	38;"	d
+SFS_IMAP_BLK_OFFSET	mkfs/sfs_fs.h	328;"	d
+SFS_IMAP_BLK_OFFSET	sfs_fs.h	164;"	d
+SFS_IMAP_BYTE_OFFSET	mkfs/sfs_fs.h	329;"	d
+SFS_IMAP_BYTE_OFFSET	sfs_fs.h	165;"	d
+SFS_IM_I	sfs.h	/^static inline struct sfs_bmap_info *SFS_IM_I(struct sfs_sb_info *sbi)$/;"	f
+SFS_INODE_SIZE	sfs.h	49;"	d
 SFS_LOG_BLOCK_SIZE	sfs_fs.h	80;"	d
+SFS_MAXNAME_LEN	sfs_fs.h	112;"	d
+SFS_MAX_REC_LEN	mkfs/sfs_fs.h	314;"	d
+SFS_MAX_REC_LEN	sfs_fs.h	153;"	d
 SFS_NAME_LEN	mkfs/sfs_fs.h	274;"	d
-SFS_NAME_LEN	sfs_fs.h	112;"	d
-SFS_NAME_LEN	sfs_fs.h	144;"	d
-SFS_NAME_LEN_BITS	mkfs/sfs_fs.h	275;"	d
-SFS_NAME_LEN_BITS	sfs_fs.h	145;"	d
-SFS_NODE_RATIO	mkfs/sfs_fs.h	342;"	d
-SFS_NODE_RATIO	sfs_fs.h	185;"	d
-SFS_REC_LEN	sfs_fs.h	151;"	d
+SFS_NODE_RATIO	mkfs/sfs_fs.h	332;"	d
+SFS_NODE_RATIO	sfs_fs.h	168;"	d
 SFS_REG_FILE	mkfs/sfs_fs.h	/^	SFS_REG_FILE,$/;"	e	enum:__anon2
 SFS_REG_FILE	sfs_fs.h	/^        SFS_REG_FILE,$/;"	e	enum:__anon1
 SFS_ROOT_INO	mkfs/sfs_fs.h	249;"	d
@@ -90,17 +95,10 @@ SFS_SUPER_MAGIC	mkfs/sfs_fs.h	166;"	d
 SFS_SUPER_MAGIC	sfs_fs.h	21;"	d
 SFS_SUPER_OFFSET	mkfs/sfs_fs.h	238;"	d
 SFS_SUPER_OFFSET	sfs_fs.h	75;"	d
-SFS_SYMLINK	mkfs/sfs_fs.h	/^	SFS_SYMLINK$/;"	e	enum:__anon2
-SFS_SYMLINK	sfs_fs.h	/^        SFS_SYMLINK$/;"	e	enum:__anon1
 SFS_TOOLS_DATE	mkfs/mkfs.h	17;"	d
 SFS_TOOLS_VERSION	mkfs/mkfs.h	16;"	d
 SFS_UNKNOWN	mkfs/sfs_fs.h	/^	SFS_UNKNOWN,$/;"	e	enum:__anon2
 SFS_UNKNOWN	sfs_fs.h	/^        SFS_UNKNOWN,$/;"	e	enum:__anon1
-SIZE_OF_DENTRY_BITMAP	mkfs/sfs_fs.h	311;"	d
-SIZE_OF_DENTRY_BITMAP	sfs_fs.h	152;"	d
-SIZE_OF_DIR_ENTRY	mkfs/sfs_fs.h	310;"	d
-SIZE_OF_RESERVED	mkfs/sfs_fs.h	313;"	d
-SIZE_OF_RESERVED	sfs_fs.h	154;"	d
 _GNU_SOURCE	mkfs/mkfs_format.c	15;"	d	file:
 _LARGEFILE64_SOURCE	mkfs/mkfs.h	9;"	d
 _LARGEFILE64_SOURCE	mkfs/mkfs_format.c	12;"	d	file:
@@ -126,7 +124,13 @@ __u8	mkfs/sfs_fs.h	/^typedef u8	__u8;$/;"	t
 _find_next_bit_le	mkfs/mkfs_lib.c	/^static __u64 _find_next_bit_le(const __u8 *addr, __u64 nbits, __u64 start, char invert)$/;"	f	file:
 addr	mkfs/sfs_fs.h	/^	__le32 addr[DEF_ADDRS_PER_BLOCK];       \/* array of data block address *\/$/;"	m	struct:indirect_node
 addr	sfs_fs.h	/^        __le32 addr[DEF_ADDRS_PER_BLOCK];       \/* array of data block address *\/$/;"	m	struct:indirect_node
+b_sbh	sfs.h	/^	struct sfs_buffer_head b_sbh;$/;"	m	struct:sfs_bmap_info	typeref:struct:sfs_bmap_info::sfs_buffer_head
+bh	sfs.h	/^	struct buffer_head *bh[SBH_MAX_BH];$/;"	m	struct:sfs_buffer_head	typeref:struct:sfs_buffer_head::buffer_head
 bits_in_byte	mkfs/mkfs_lib.c	/^static const int bits_in_byte[256] = {$/;"	v	file:
+blkcnt_data	sfs.h	/^        unsigned int blkcnt_data;$/;"	m	struct:sfs_sb_info
+blkcnt_dmap	sfs.h	/^        unsigned int blkcnt_dmap;$/;"	m	struct:sfs_sb_info
+blkcnt_imap	sfs.h	/^        unsigned int blkcnt_imap;$/;"	m	struct:sfs_sb_info
+blkcnt_inode	sfs.h	/^        unsigned int blkcnt_inode;$/;"	m	struct:sfs_sb_info
 block_count	mkfs/sfs_fs.h	/^	__le64 block_count;             \/* total # of user blocks *\/$/;"	m	struct:sfs_super_block
 block_count	sfs_fs.h	/^        __le64 block_count;             \/* total # of user blocks *\/$/;"	m	struct:sfs_super_block
 block_count_data	mkfs/sfs_fs.h	/^	__le32 block_count_data;        \/* # of blocks for data *\/$/;"	m	struct:sfs_super_block
@@ -145,25 +149,25 @@ bswap_16	mkfs/sfs_fs.h	/^static inline u_int16_t bswap_16(u_int16_t val)$/;"	f
 bswap_32	mkfs/sfs_fs.h	/^static inline u_int32_t bswap_32(u_int32_t val)$/;"	f
 bswap_64	mkfs/sfs_fs.h	/^static inline u_int64_t bswap_64(u_int64_t val)$/;"	f
 c	mkfs/mkfs.h	/^struct sfs_configuration c;$/;"	v	typeref:struct:sfs_configuration
+count	sfs.h	/^	unsigned int count;$/;"	m	struct:sfs_buffer_head
 cpu_to_le16	mkfs/sfs_fs.h	103;"	d
 cpu_to_le16	mkfs/sfs_fs.h	96;"	d
 cpu_to_le32	mkfs/sfs_fs.h	104;"	d
 cpu_to_le32	mkfs/sfs_fs.h	97;"	d
 cpu_to_le64	mkfs/sfs_fs.h	105;"	d
 cpu_to_le64	mkfs/sfs_fs.h	98;"	d
-d_addr	mkfs/sfs_fs.h	/^	__le32 d_addr[DEF_ADDRS_PER_INODE];     \/* Pointers to data blocks *\/$/;"	m	struct:sfs_inode
 data_blkaddr	mkfs/sfs_fs.h	/^	__le32 data_blkaddr;            \/* start block address of data *\/$/;"	m	struct:sfs_super_block
+data_blkaddr	sfs.h	/^        unsigned int data_blkaddr;$/;"	m	struct:sfs_sb_info
 data_blkaddr	sfs_fs.h	/^        __le32 data_blkaddr;            \/* start block address of data *\/$/;"	m	struct:sfs_super_block
 dbg_lv	mkfs/sfs_fs.h	/^	int dbg_lv;$/;"	m	struct:sfs_configuration
 dbg_lv	sfs_fs.h	/^	int dbg_lv;$/;"	m	struct:sfs_configuration
-dentry	mkfs/sfs_fs.h	/^	struct sfs_dir_entry dentry[DENTRY_IN_BLOCK];$/;"	m	struct:sfs_dentry_block	typeref:struct:sfs_dentry_block::sfs_dir_entry
-dentry	sfs_fs.h	/^        struct sfs_dir_entry dentry[DENTRY_IN_BLOCK];$/;"	m	struct:sfs_dentry_block	typeref:struct:sfs_dentry_block::sfs_dir_entry
-dentry_bitmap	mkfs/sfs_fs.h	/^	__u8 dentry_bitmap[SIZE_OF_DENTRY_BITMAP];$/;"	m	struct:sfs_dentry_block
-dentry_bitmap	sfs_fs.h	/^	__u8 dentry_bitmap[SIZE_OF_DENTRY_BITMAP];$/;"	m	struct:sfs_dentry_block
+dentry	mkfs/sfs_fs.h	/^	struct sfs_dir_entry dentry[255];$/;"	m	struct:sfs_dentry_block	typeref:struct:sfs_dentry_block::sfs_dir_entry
 destroy_inode_cache	super.c	/^static void destroy_inode_cache(void)$/;"	f	file:
 dev_write	mkfs/mkfs_io.c	/^int dev_write(void *buf, __u64 offset, size_t len)$/;"	f
 dev_write_block	mkfs/mkfs_io.c	/^int dev_write_block(void *buf, __u64 blk_addr)$/;"	f
+dm_i	sfs.h	/^	struct sfs_bmap_info *dm_i;$/;"	m	struct:sfs_sb_info	typeref:struct:sfs_sb_info::sfs_bmap_info
 dmap_blkaddr	mkfs/sfs_fs.h	/^	__le32 dmap_blkaddr;            \/* start block address of data bmap *\/$/;"	m	struct:sfs_super_block
+dmap_blkaddr	sfs.h	/^        unsigned int dmap_blkaddr;$/;"	m	struct:sfs_sb_info
 dmap_blkaddr	sfs_fs.h	/^        __le32 dmap_blkaddr;            \/* start block address of data bmap *\/$/;"	m	struct:sfs_super_block
 end_blkaddr	mkfs/sfs_fs.h	/^	u_int64_t end_blkaddr;$/;"	m	struct:sfs_configuration
 end_blkaddr	sfs_fs.h	/^	u_int64_t end_blkaddr;$/;"	m	struct:sfs_configuration
@@ -171,9 +175,7 @@ exit_sfs_fs	super.c	/^static void __exit exit_sfs_fs(void)$/;"	f	file:
 fd	mkfs/sfs_fs.h	/^	int32_t fd;$/;"	m	struct:sfs_configuration
 fd	sfs_fs.h	/^	int32_t fd;$/;"	m	struct:sfs_configuration
 file_type	mkfs/sfs_fs.h	/^	__u8 file_type;               \/* file type *\/$/;"	m	struct:sfs_dir_entry
-file_type	sfs_fs.h	/^        __u8 file_type;               \/* file type *\/$/;"	m	struct:sfs_dir_entry
-filename	mkfs/sfs_fs.h	/^	__u8 filename[SFS_NAME_LEN];    \/* file name *\/$/;"	m	struct:sfs_dir_entry
-filename	sfs_fs.h	/^        __u8 filename[SFS_NAME_LEN];    \/* file name *\/$/;"	m	struct:sfs_dir_entry
+file_type	sfs_fs.h	/^	__u8 file_type;$/;"	m	struct:sfs_dir_entry
 find_next_bit_le	mkfs/mkfs_lib.c	/^__u64 find_next_bit_le(const __u8 *addr, __u64 size, __u64 offset)$/;"	f
 find_next_zero_bit_le	mkfs/mkfs_lib.c	/^__u64 find_next_zero_bit_le(const __u8 *addr, __u64 size, __u64 offset)$/;"	f
 get_bits_in_byte	mkfs/mkfs_lib.c	/^int get_bits_in_byte(unsigned char n)$/;"	f
@@ -189,7 +191,6 @@ get_sb_le64	mkfs/sfs_fs.h	195;"	d
 get_sb_le64	sfs_fs.h	50;"	d
 heap	mkfs/sfs_fs.h	/^	int heap;$/;"	m	struct:sfs_configuration
 heap	sfs_fs.h	/^	int heap;$/;"	m	struct:sfs_configuration
-i_addr	mkfs/sfs_fs.h	/^	__le32 i_addr[DEF_NIDS_PER_INODE];      \/* indirect, double indirect,$/;"	m	struct:sfs_inode
 i_advise	mkfs/sfs_fs.h	/^	__u8 i_advise;                  \/* file hints *\/$/;"	m	struct:sfs_inode
 i_advise	sfs_fs.h	/^        __u8 i_advise;                  \/* file hints *\/$/;"	m	struct:sfs_inode
 i_atime	mkfs/sfs_fs.h	/^	__le64 i_atime;                 \/* access time *\/$/;"	m	struct:sfs_inode
@@ -202,15 +203,17 @@ i_ctime	mkfs/sfs_fs.h	/^	__le64 i_ctime;                 \/* creation time *\/$/
 i_ctime	sfs_fs.h	/^        __le64 i_ctime;                 \/* creation time *\/$/;"	m	struct:sfs_inode
 i_ctime_nsec	mkfs/sfs_fs.h	/^	__le32 i_ctime_nsec;            \/* creation time in nano scale *\/$/;"	m	struct:sfs_inode
 i_ctime_nsec	sfs_fs.h	/^        __le32 i_ctime_nsec;            \/* creation time in nano scale *\/$/;"	m	struct:sfs_inode
+i_daddr	mkfs/sfs_fs.h	/^	__le32 i_daddr[DEF_ADDRS_PER_INODE];     \/* Pointers to data blocks *\/$/;"	m	struct:sfs_inode
+i_daddr	sfs_fs.h	/^        __le32 i_daddr[DEF_ADDRS_PER_INODE];     \/* Pointers to data blocks *\/$/;"	m	struct:sfs_inode
 i_data	sfs.h	/^	__le32 i_data[15];$/;"	m	struct:sfs_inode_info
-i_dblock	sfs_fs.h	/^        __le32 i_dblock[DEF_ADDRS_PER_INODE];     \/* Pointers to data blocks *\/$/;"	m	struct:sfs_inode
 i_dir_start_lookup	sfs.h	/^	__u32 i_dir_start_lookup;$/;"	m	struct:sfs_inode_info
 i_flags	mkfs/sfs_fs.h	/^	__le32 i_flags;                 \/* file attributes *\/$/;"	m	struct:sfs_inode
 i_flags	sfs.h	/^	__u32 i_flags;$/;"	m	struct:sfs_inode_info
 i_flags	sfs_fs.h	/^        __le32 i_flags;                 \/* file attributes *\/$/;"	m	struct:sfs_inode
 i_gid	mkfs/sfs_fs.h	/^	__le32 i_gid;                   \/* group ID *\/$/;"	m	struct:sfs_inode
 i_gid	sfs_fs.h	/^        __le32 i_gid;                   \/* group ID *\/$/;"	m	struct:sfs_inode
-i_iblock	sfs_fs.h	/^        __le32 i_iblock[DEF_IDPS_PER_INODE];      \/* indirect, double indirect,$/;"	m	struct:sfs_inode
+i_iaddr	mkfs/sfs_fs.h	/^	__le32 i_iaddr[DEF_NIDS_PER_INODE];      \/* indirect, double indirect,$/;"	m	struct:sfs_inode
+i_iaddr	sfs_fs.h	/^        __le32 i_iaddr[DEF_IDPS_PER_INODE];      \/* indirect, double indirect,$/;"	m	struct:sfs_inode
 i_inline	mkfs/sfs_fs.h	/^	__u8 i_inline;                  \/* file inline flags *\/$/;"	m	struct:sfs_inode
 i_inline	sfs_fs.h	/^        __u8 i_inline;                  \/* file inline flags *\/$/;"	m	struct:sfs_inode
 i_links	mkfs/sfs_fs.h	/^	__le32 i_links;                 \/* links count *\/$/;"	m	struct:sfs_inode
@@ -221,25 +224,24 @@ i_mtime	mkfs/sfs_fs.h	/^	__le64 i_mtime;                 \/* modification time *
 i_mtime	sfs_fs.h	/^        __le64 i_mtime;                 \/* modification time *\/$/;"	m	struct:sfs_inode
 i_mtime_nsec	mkfs/sfs_fs.h	/^	__le32 i_mtime_nsec;            \/* modification time in nano scale *\/$/;"	m	struct:sfs_inode
 i_mtime_nsec	sfs_fs.h	/^        __le32 i_mtime_nsec;            \/* modification time in nano scale *\/$/;"	m	struct:sfs_inode
-i_name	mkfs/sfs_fs.h	/^	__u8 i_name[SFS_NAME_LEN];      \/* file name for SPOR *\/$/;"	m	struct:sfs_inode
-i_name	sfs_fs.h	/^        __u8 i_name[SFS_NAME_LEN];      \/* file name for SPOR *\/$/;"	m	struct:sfs_inode
-i_namelen	mkfs/sfs_fs.h	/^	__le32 i_namelen;               \/* file name length *\/$/;"	m	struct:sfs_inode
-i_namelen	sfs_fs.h	/^        __le32 i_namelen;               \/* file name length *\/$/;"	m	struct:sfs_inode
-i_no	mkfs/sfs_fs.h	/^	__le32 i_no;			\/* inode number *\/$/;"	m	struct:sfs_dir_entry
-i_no	sfs_fs.h	/^        __le32 i_no;                    \/* inode number *\/$/;"	m	struct:sfs_dir_entry
 i_pino	mkfs/sfs_fs.h	/^	__le32 i_pino;                  \/* parent inode number *\/$/;"	m	struct:sfs_inode
 i_pino	sfs_fs.h	/^        __le32 i_pino;                  \/* parent inode number *\/$/;"	m	struct:sfs_inode
 i_size	mkfs/sfs_fs.h	/^	__le64 i_size;                  \/* file size in bytes *\/$/;"	m	struct:sfs_inode
 i_size	sfs_fs.h	/^        __le64 i_size;                  \/* file size in bytes *\/$/;"	m	struct:sfs_inode
 i_uid	mkfs/sfs_fs.h	/^	__le32 i_uid;                   \/* user ID *\/$/;"	m	struct:sfs_inode
 i_uid	sfs_fs.h	/^        __le32 i_uid;                   \/* user ID *\/$/;"	m	struct:sfs_inode
+im_i	sfs.h	/^	struct sfs_bmap_info *im_i;$/;"	m	struct:sfs_sb_info	typeref:struct:sfs_sb_info::sfs_bmap_info
 imap_blkaddr	mkfs/sfs_fs.h	/^	__le32 imap_blkaddr;            \/* start block address of inode bmap *\/$/;"	m	struct:sfs_super_block
+imap_blkaddr	sfs.h	/^        unsigned int imap_blkaddr;$/;"	m	struct:sfs_sb_info
 imap_blkaddr	sfs_fs.h	/^        __le32 imap_blkaddr;            \/* start block address of inode bmap *\/$/;"	m	struct:sfs_super_block
 indirect_node	mkfs/sfs_fs.h	/^struct indirect_node {$/;"	s
 indirect_node	sfs_fs.h	/^struct indirect_node {$/;"	s
+init_im_info	super.c	/^static int init_im_info(struct sfs_sb_info *sbi)$/;"	f	file:
 init_inode_cache	super.c	/^static int __init init_inode_cache(void)$/;"	f	file:
 init_once	super.c	/^static void init_once(void *foo)$/;"	f	file:
 init_sfs_fs	super.c	/^static int __init init_sfs_fs(void)$/;"	f	file:
+inode	mkfs/sfs_fs.h	/^	__le32 inode;$/;"	m	struct:sfs_dir_entry
+inode	sfs_fs.h	/^        __le32 inode;			\/* inode number *\/$/;"	m	struct:sfs_dir_entry
 inode_blkaddr	sfs.h	/^	unsigned int inode_blkaddr;$/;"	m	struct:sfs_sb_info
 inodes_blkaddr	mkfs/sfs_fs.h	/^	__le32 inodes_blkaddr;          \/* start block address of inodes *\/$/;"	m	struct:sfs_super_block
 inodes_blkaddr	sfs_fs.h	/^        __le32 inodes_blkaddr;          \/* start block address of inodes *\/$/;"	m	struct:sfs_super_block
@@ -257,6 +259,10 @@ main	mkfs/mkfs_main.c	/^int main(int argc, char *argv[]) {$/;"	f
 max	mkfs/sfs_fs.h	232;"	d
 min	mkfs/sfs_fs.h	226;"	d
 mkfs_usage	mkfs/mkfs_main.c	/^static void mkfs_usage(void) {$/;"	f	file:
+name	mkfs/sfs_fs.h	/^	__u8 name[SFS_NAME_LEN];    \/* file name *\/$/;"	m	struct:sfs_dir_entry
+name	sfs_fs.h	/^        __u8 name[SFS_MAXNAME_LEN];	 \/* file name *\/$/;"	m	struct:sfs_dir_entry
+name_len	mkfs/sfs_fs.h	/^	__u8 name_len;$/;"	m	struct:sfs_dir_entry
+name_len	sfs_fs.h	/^	__u8 name_len;$/;"	m	struct:sfs_dir_entry
 open_check_fs	mkfs/mkfs_lib.c	/^static int open_check_fs(char *path, int flag)$/;"	f	file:
 path	mkfs/sfs_fs.h	/^	char *path;$/;"	m	struct:sfs_configuration
 path	mkfs/sfs_fs.h	/^	char path[MAX_PATH_LEN];$/;"	m	struct:sfs_super_block
@@ -265,6 +271,8 @@ path	sfs_fs.h	/^	char path[MAX_PATH_LEN];$/;"	m	struct:sfs_super_block
 raw_sb	mkfs/mkfs_format.c	/^struct sfs_super_block raw_sb;$/;"	v	typeref:struct:sfs_super_block
 raw_super	sfs.h	/^	struct sfs_super_block *raw_super;		\/* raw super block pointer *\/$/;"	m	struct:sfs_sb_info	typeref:struct:sfs_sb_info::sfs_super_block
 read_raw_super_block	super.c	/^static int read_raw_super_block(struct sfs_sb_info *sbi,$/;"	f	file:
+rec_len	mkfs/sfs_fs.h	/^	__le16 rec_len;$/;"	m	struct:sfs_dir_entry
+rec_len	sfs_fs.h	/^	__le16 rec_len;$/;"	m	struct:sfs_dir_entry
 root_addr	mkfs/sfs_fs.h	/^	__le32 root_addr;               \/* root inode blkaddr *\/$/;"	m	struct:sfs_super_block
 root_addr	sfs_fs.h	/^        __le32 root_addr;               \/* root inode blkaddr *\/$/;"	m	struct:sfs_super_block
 root_gid	mkfs/sfs_fs.h	/^	u_int32_t root_gid;$/;"	m	struct:sfs_configuration
@@ -272,9 +280,9 @@ root_gid	sfs_fs.h	/^	u_int32_t root_gid;$/;"	m	struct:sfs_configuration
 root_uid	mkfs/sfs_fs.h	/^	u_int32_t root_uid;$/;"	m	struct:sfs_configuration
 root_uid	sfs_fs.h	/^	u_int32_t root_uid;$/;"	m	struct:sfs_configuration
 round_down	mkfs/sfs_fs.h	224;"	d
-s_lock	sfs.h	/^	spinlock_t s_lock;$/;"	m	struct:sfs_sb_info
 sb	mkfs/mkfs_format.c	/^struct sfs_super_block *sb = &raw_sb;$/;"	v	typeref:struct:sfs_super_block
 sb	sfs.h	/^	struct super_block *sb;				\/* pointer to VFS super block *\/$/;"	m	struct:sfs_sb_info	typeref:struct:sfs_sb_info::super_block
+sbh_sync_block	super.c	/^void sbh_sync_block(struct sfs_buffer_head *sbh)$/;"	f
 sector_size	mkfs/sfs_fs.h	/^	__le32 sector_size;		\/* sector size in bytes *\/$/;"	m	struct:sfs_super_block
 sector_size	mkfs/sfs_fs.h	/^	u_int32_t sector_size;$/;"	m	struct:sfs_configuration
 sector_size	sfs_fs.h	/^	u_int32_t sector_size;$/;"	m	struct:sfs_configuration
@@ -295,12 +303,14 @@ sfs_add_default_dentry_root	mkfs/mkfs_format.c	/^static int sfs_add_default_dent
 sfs_alloc_inode	super.c	/^static struct inode *sfs_alloc_inode(struct super_block *sb)$/;"	f	file:
 sfs_aops	super.c	/^const struct address_space_operations sfs_aops = {$/;"	v	typeref:struct:address_space_operations
 sfs_bmap	super.c	/^static sector_t sfs_bmap(struct address_space *mapping, sector_t block)$/;"	f	file:
+sfs_bmap_info	sfs.h	/^struct sfs_bmap_info {$/;"	s
+sfs_buffer_head	sfs.h	/^struct sfs_buffer_head {$/;"	s
 sfs_clear_bit	mkfs/mkfs_lib.c	/^int sfs_clear_bit(unsigned int nr, char *addr)$/;"	f
 sfs_configuration	mkfs/sfs_fs.h	/^struct sfs_configuration {$/;"	s
 sfs_configuration	sfs_fs.h	/^struct sfs_configuration {$/;"	s
+sfs_create	super.c	/^static int sfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, bool excl)$/;"	f	file:
 sfs_create_root_dir	mkfs/mkfs_format.c	/^static int sfs_create_root_dir(void)$/;"	f	file:
 sfs_dentry_block	mkfs/sfs_fs.h	/^struct sfs_dentry_block {$/;"	s
-sfs_dentry_block	sfs_fs.h	/^struct sfs_dentry_block {$/;"	s
 sfs_dev_is_mounted	mkfs/mkfs_lib.c	/^int sfs_dev_is_mounted(void)$/;"	f
 sfs_dir_entry	mkfs/sfs_fs.h	/^struct sfs_dir_entry {$/;"	s
 sfs_dir_entry	sfs_fs.h	/^struct sfs_dir_entry {$/;"	s
@@ -325,12 +335,15 @@ sfs_inode	sfs_fs.h	/^struct sfs_inode {$/;"	s
 sfs_inode_by_name	super.c	/^ino_t sfs_inode_by_name(struct inode *dir, const struct qstr *qstr)$/;"	f
 sfs_inode_cachep	super.c	/^static struct kmem_cache *sfs_inode_cachep;$/;"	v	typeref:struct:kmem_cache	file:
 sfs_inode_info	sfs.h	/^struct sfs_inode_info {$/;"	s
-sfs_inotoba	sfs.h	61;"	d
+sfs_inotoba	sfs.h	80;"	d
 sfs_last_byte	super.c	/^static unsigned sfs_last_byte(struct inode *inode, unsigned long page_nr)$/;"	f	file:
+sfs_load_imap	super.c	/^struct sfs_bmap_info *sfs_load_imap(struct super_block *sb)$/;"	f
 sfs_lookup	super.c	/^static struct dentry *sfs_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags)$/;"	f	file:
-sfs_match	super.c	/^static inline int sfs_match(struct super_block *sb, const unsigned char *name, struct sfs_dir_entry *de)$/;"	f	file:
+sfs_match	super.c	/^static inline int sfs_match(int len, const unsigned char *name, struct sfs_dir_entry *de)$/;"	f	file:
 sfs_mount	super.c	/^static struct dentry *sfs_mount(struct file_system_type *fs_type, int flags,$/;"	f	file:
 sfs_msg	super.c	/^void sfs_msg(struct super_block *sb, const char *level, const char *fmt, ...)$/;"	f
+sfs_new_inode	super.c	/^struct inode *sfs_new_inode(struct inode *dir, umode_t mode)$/;"	f
+sfs_next_entry	super.c	/^static inline struct sfs_dir_entry *sfs_next_entry(struct sfs_dir_entry *p)$/;"	f	file:
 sfs_parse_options	mkfs/mkfs_main.c	/^static void sfs_parse_options(int argc, char *argv[])$/;"	f	file:
 sfs_prepare_super_block	mkfs/mkfs_format.c	/^static int sfs_prepare_super_block(void) {$/;"	f	file:
 sfs_put_page	super.c	/^static inline void sfs_put_page(struct page *page)$/;"	f	file:

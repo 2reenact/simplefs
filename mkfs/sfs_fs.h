@@ -327,7 +327,7 @@ enum {
 
 #define SFS_IMAP_BLK_OFFSET		2	/* imap block offset is 1 */
 #define SFS_IMAP_BYTE_OFFSET		4096	/* imap byte offset is 4096 */
-#define MAP_SIZE_ALIGN(size)		((size) + SFS_BLKSIZE) / SFS_BLKSIZE
+#define MAP_SIZE_ALIGN(size)		((((size + BITS_PER_BYTE - 1) / BITS_PER_BYTE) + SFS_BLKSIZE) / SFS_BLKSIZE)
 
 #define SFS_NODE_RATIO			128	/* node : data ratio is 1 : 128 */
 

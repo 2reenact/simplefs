@@ -168,7 +168,7 @@ static int sfs_add_default_dentry_root(void)
 	memset(&dentry, 0, rec_len);
 	dentry.file_type = 0666;
 	dentry.inode = SFS_ROOT_INO;
-	dentry.name_len = 1;
+	dentry.name_len = 2;
 	dentry.rec_len = 4096 - rec_len;
 	memcpy(dentry.name, "..", 2);
 	memcpy(dent_blk + rec_len, &dentry, rec_len);
