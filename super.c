@@ -393,7 +393,7 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 					sfs_put_page(page);
 					goto out_find_entry;
 				}
-				printk(KERN_ERR "jy: find_entry4: %d %s\n", de->inode, de->name);
+				printk(KERN_ERR "jy: find_entry4: %d/%s\n", de->inode, de->name);
 				if (sfs_match(namelen, name, de))
 					goto entry_found;
 				de = sfs_next_entry(de);
@@ -560,19 +560,23 @@ int sfs_add_link(struct dentry *dentry, struct inode *inode)
 	loff_t pos;
 	int err;
 
+	printk(KERN_ERR "jy: add_link %s\n", name);
 	for (n = 0; n <= npages; n++) {
 		char *dir_end;
 
+		printk(KERN_ERR "jy: add_link1\n");
 		page = sfs_get_page(dir, n);
 		err = PTR_ERR(page);
 		if (IS_ERR(page))
 			goto out_add_link;
 		lock_page(page);
+		printk(KERN_ERR "jy: add_link2\n");
 		kaddr = page_address(page);
 		dir_end = kaddr + sfs_last_byte(dir, n);
 		de = (struct sfs_dir_entry *)kaddr;
 		kaddr += PAGE_SIZE - reclen;
 		while ((char *)de <= kaddr) {
+			printk(KERN_ERR "jy: add_link3 %d %s\n", de->inode, de->name);
 			if ((char *)de == dir_end) {
 				name_len = 0;
 				rec_len = SFS_BLKSIZE;
@@ -586,12 +590,14 @@ int sfs_add_link(struct dentry *dentry, struct inode *inode)
 				goto out_unlock;
 			}	
 			err = -EEXIST;
+			printk(KERN_ERR "jy: add_link4\n");
 			if (sfs_match(namelen, name, de))
 				goto out_unlock;
 			name_len = SFS_DIR_REC_LEN(de->name_len);
 			rec_len = le16_to_cpu(de->rec_len);
 			if (!de->inode && rec_len >= reclen)
 				goto got_it;
+			printk(KERN_ERR "jy: add_link5\n");
 			if (rec_len >= name_len + reclen)
 				goto got_it;
 			de = (struct sfs_dir_entry *)((char *)de + rec_len);
@@ -599,13 +605,17 @@ int sfs_add_link(struct dentry *dentry, struct inode *inode)
 		unlock_page(page);
 		sfs_put_page(page);
 	}
+	printk(KERN_ERR "jy: add_link6\n");
 	return -EINVAL;
 
 got_it:
+	printk(KERN_ERR "jy: add_link7\n");
 	pos = page_offset(page) + (char *)de - (char *)page_address(page);
 	err = sfs_prepare_chunk(page, pos, rec_len);
+	printk(KERN_ERR "jy: add_link8\n");
 	if (err)
 		goto out_unlock;
+	printk(KERN_ERR "jy: add_link9\n");
 	if (de->inode) {
 		struct sfs_dir_entry *del = (struct sfs_dir_entry *)((char *)de + name_len);
 		del->rec_len = cpu_to_le16(rec_len - name_len);
@@ -625,20 +635,25 @@ got_it:
 	mark_inode_dirty(dir);
 
 out_put:
+	printk(KERN_ERR "jy: add_link10\n");
 	sfs_put_page(page);
 
 out_add_link:
+	printk(KERN_ERR "jy: add_link11\n");
 	return err;
 
 out_unlock:
+	printk(KERN_ERR "jy: add_link12\n");
 	unlock_page(page);
 	goto out_put;
 }
 
 static inline int sfs_add_nondir(struct dentry *dentry, struct inode *inode)
 {
-	int err = sfs_add_link(dentry, inode);
+//	int err = sfs_add_link(dentry, inode);
+	int err;
 	printk(KERN_ERR "jy: add_nondir\n");
+	err = sfs_add_link(dentry, inode);
 	if (!err) {
 		d_instantiate_new(dentry, inode);
 		return 0;
@@ -654,11 +669,8 @@ static inline int sfs_add_nondir(struct dentry *dentry, struct inode *inode)
 static int sfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, bool excl)
 {
 	struct inode *inode;
-	
-	printk(KERN_ERR "jy: create\n");
-	if (dentry->d_name.name)
-		printk(KERN_ERR " %s", dentry->d_name.name);
-	printk(KERN_ERR "\n");
+
+	printk(KERN_ERR "jy: create %s\n", dentry->d_name.name);
 	inode = sfs_new_inode(dir, mode);
 	if (IS_ERR(inode))
 		return PTR_ERR(inode);
@@ -748,7 +760,8 @@ static int sfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	struct inode *inode;
 	int err;
 
-	printk(KERN_ERR "jy: mkdir\n");
+	printk(KERN_ERR "jy: mkdir %ld/%s\n", dir->i_ino, dentry->d_name.name);
+	dump_stack();
 	inode_inc_link_count(dir);
 
 	inode = sfs_new_inode(dir, S_IFDIR|mode);
@@ -996,6 +1009,7 @@ static void sfs_fill_inode(struct inode *inode, struct sfs_inode *sfs_inode)
 {
 	struct sfs_inode_info *si = SFS_I(inode);
 
+	printk(KERN_ERR "jy: fill_inode\n");
 	sfs_inode->i_mode = cpu_to_le16(inode->i_mode);
 	sfs_inode->i_links = cpu_to_le16(inode->i_nlink);
 
@@ -1024,14 +1038,20 @@ static int sfs_update_inode(struct inode *inode, int do_sync) {
 	struct sfs_inode *sfs_inode;
 	struct buffer_head *bh;
 
+	printk(KERN_ERR "jy: update_inode %ld\n", inode->i_ino);
 	bh = sb_bread(sb, sfs_inotoba(inode->i_ino));
+	if (!bh) {
+		sfs_msg(KERN_ERR, "sfs_update_inode", "Failed to read inode %lu\n", inode->i_ino);
+		return -1;
+	}
 
 	sfs_inode = (struct sfs_inode *)bh->b_data;
 
 	sfs_fill_inode(inode, sfs_inode);
+	printk(KERN_ERR "jy: update_inode0\n");
 
 	mark_buffer_dirty(bh);
-	if (do_sync)
+//	if (do_sync)
 		sync_dirty_buffer(bh);
 	brelse(bh);
 
