@@ -68,7 +68,7 @@ static struct inode *sfs_alloc_inode(struct super_block *sb)
 
 static void sfs_free_inode(struct inode *inode)
 {
-	printk(KERN_ERR "jy: free_inode\n");
+	printk(KERN_ERR "jy: free_inode %lu\n", inode->i_ino);
 	kmem_cache_free(sfs_inode_cachep, SFS_I(inode));
 }
 
@@ -761,7 +761,6 @@ static int sfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	int err;
 
 	printk(KERN_ERR "jy: mkdir %ld/%s\n", dir->i_ino, dentry->d_name.name);
-	dump_stack();
 	inode_inc_link_count(dir);
 
 	inode = sfs_new_inode(dir, S_IFDIR|mode);
@@ -1041,14 +1040,16 @@ static int sfs_update_inode(struct inode *inode, int do_sync) {
 	printk(KERN_ERR "jy: update_inode %ld\n", inode->i_ino);
 	bh = sb_bread(sb, sfs_inotoba(inode->i_ino));
 	if (!bh) {
+		printk(KERN_ERR "jy: update_inode0\n");
 		sfs_msg(KERN_ERR, "sfs_update_inode", "Failed to read inode %lu\n", inode->i_ino);
 		return -1;
 	}
+	printk(KERN_ERR "jy: update_inode1\n");
 
 	sfs_inode = (struct sfs_inode *)bh->b_data;
 
 	sfs_fill_inode(inode, sfs_inode);
-	printk(KERN_ERR "jy: update_inode0\n");
+	printk(KERN_ERR "jy: update_inode2 %lu\n", bh_offset(bh));
 
 	mark_buffer_dirty(bh);
 //	if (do_sync)
@@ -1060,7 +1061,7 @@ static int sfs_update_inode(struct inode *inode, int do_sync) {
 
 int sfs_write_inode(struct inode *inode, struct writeback_control *wbc)
 {
-	printk(KERN_ERR "jy: write_inode\n");
+	printk(KERN_ERR "jy: write_inode %lu\n", inode->i_ino);
 	return sfs_update_inode(inode, wbc->sync_mode == WB_SYNC_ALL);
 }
 
