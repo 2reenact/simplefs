@@ -306,8 +306,6 @@ static int sfs_write_end(struct file *file, struct address_space *mapping,
 	int ret;
 
 	printk(KERN_ERR "jy: write_end\n");
-	if (unlikely(ret))
-		sfs_write_failed(mapping, pos + len);
 	ret = generic_write_end(file, mapping, pos, len, copied, page, fsdata);
 	if (ret < len)
 		sfs_write_failed(mapping, pos + len);
@@ -430,35 +428,13 @@ void sbh_sync_block(struct sfs_buffer_head *sbh)
 	}
 }
 
-struct sfs_bmap_info *sfs_load_imap(struct super_block *sb)
-{
-	struct sfs_sb_info *sbi = SFS_SB(sb);
-	struct sfs_bmap_info *im_i = SFS_IM_I(sbi);
-	struct sfs_buffer_head *sbh = &im_i->b_sbh;
-	unsigned int i, j, count;
-
-	if (!sbh->count)
-		goto load;
-
-
-load:
-	count = min(sbi->blkcnt_imap, SBH_MAX_BH);
-	sbh->count = count;
-
-	for (i = 0; i < count; i++) {
-		
-	}
-
-	
-}
-
 struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 {
 	struct super_block *sb;
 	struct sfs_sb_info *sbi;
 	struct buffer_head *bitmap_bh = NULL;
 	struct buffer_head *bh;
-	unsigned i, j, start;
+	unsigned i;
 	ino_t ino = 0;
 	struct inode *inode;
 	struct sfs_inode_info *si;
@@ -492,7 +468,7 @@ struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 		ino = 0;
 
 		ino = find_next_zero_bit_le(bitmap_bh->b_data, SFS_BLKSIZE, 0);
-		printk(KERN_ERR "jy: new_inode1 %d\n", ino);
+		printk(KERN_ERR "jy: new_inode1 %ld\n", ino);
 		if (ino > sfs_get(blkcnt_inode) + SFS_ROOT_INO) {
 			brelse(bitmap_bh);
 			err = -EIO;
@@ -513,7 +489,7 @@ got:
 	brelse(bitmap_bh);
 
 	ino += SFS_ROOT_INO;
-	printk(KERN_ERR "jy: new_inode3.5 %d\n", ino);
+	printk(KERN_ERR "jy: new_inode3.5 %ld\n", ino);
 
 	if (S_ISDIR(mode)) {
 		
@@ -798,8 +774,8 @@ int sfs_setattr(struct dentry *dentry, struct iattr *attr)
 const struct inode_operations sfs_dir_inode_operations = {
 	.lookup         = sfs_lookup,
 	.create		= sfs_create,
-/*
 	.mkdir          = sfs_mkdir,
+/*
 	.link           = sfs_link,
 	.unlink         = sfs_unlink,
 	.symlink        = sfs_symlink,
@@ -1035,25 +1011,6 @@ static int read_raw_super_block(struct sfs_sb_info *sbi,
 	return err;
 }
 
-static int init_im_info(struct sfs_sb_info *sbi)
-{
-	struct sfs_bmap_info *im_i = SFS_IM_I(sbi);
-
-	sbi->im_i = kzalloc(sizeof(struct sfs_buffer_head), GFP_KERNEL);
-	if (!sbi->im_i)
-		return -ENOMEM;
-
-	im_i->b_sbh.count = 0;
-	if (!sfs_load_imap(sbi->sb))
-		goto free_im_i;
-
-	return 0;
-
-free_im_i:
-	kvfree(sbi->im_i);
-	return -1;
-}
-
 static int sfs_read_inode(struct inode *inode, struct sfs_inode *sfs_inode)
 {       
 	struct sfs_inode_info *si = SFS_I(inode);
@@ -1177,15 +1134,6 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 	sbi->blkcnt_data = le32_to_cpu(raw_super->block_count_data);
 
 	//flag operation
-
-	//jy init dm_i, im_i
-/*
-	ret = init_im_info(sbi);
-	if (ret) {
-		sfs_msg(sb, KERN_ERR, "Failed to init imap info");
-		goto free_raw_super;
-	}
-*/
 
 	printk(KERN_ERR "jy: fill_super1\n");
 	root = sfs_iget(sb, SFS_ROOT_INO);
