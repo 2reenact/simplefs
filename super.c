@@ -33,6 +33,8 @@ struct inode *sfs_iget(struct super_block *sb, unsigned long ino);
 
 const struct inode_operations sfs_file_inode_operations;
 const struct file_operations sfs_file_operations;
+const struct inode_operations sfs_dir_inode_operations;
+const struct file_operations sfs_dir_operations;
 
 
 void sfs_msg(const char *level, const char *funtion, const char *fmt, ...)
@@ -122,13 +124,13 @@ static struct page *sfs_get_page(struct inode *dir, unsigned long n)
 		kmap(page);
 		if (unlikely(!PageChecked(page))) {
 			if (PageError(page))// || !sfs_check_page(page))
-				goto fail;
+				goto get_page_fail;
 		}
 		printk(KERN_ERR "jy: get_page1\n");
 	}
 	return page;
 
-fail:
+get_page_fail:
 	printk(KERN_ERR "jy: get_page2\n");
 	sfs_put_page(page);
 	return ERR_PTR(-EIO);
@@ -263,12 +265,10 @@ static int sfs_readpage(struct file *file, struct page *page)
 	return block_read_full_page(page, sfs_get_block);
 }
 
-#if 0
 int sfs_prepare_chunk(struct page *page, loff_t pos, unsigned len)
 {
-		return __block_write_begin(page, pos, len, sfs_get_block);
+	return __block_write_begin(page, pos, len, sfs_get_block);
 }
-#endif
 
 static void sfs_truncate_blocks(struct inode * inode) {
 
@@ -481,9 +481,6 @@ struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 	si = SFS_I(inode);
 	sbi = SFS_SB(sb);
 
-	
-	//jy
-
 	for (i = 0; i < sfs_get(blkcnt_imap); i++) {
 		brelse(bitmap_bh);
 		printk(KERN_ERR "jy: new_inode0 %d\n", sfs_get(imap_blkaddr) + i);
@@ -497,6 +494,7 @@ struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 		ino = find_next_zero_bit_le(bitmap_bh->b_data, SFS_BLKSIZE, 0);
 		printk(KERN_ERR "jy: new_inode1 %d\n", ino);
 		if (ino > sfs_get(blkcnt_inode) + SFS_ROOT_INO) {
+			brelse(bitmap_bh);
 			err = -EIO;
 			goto failed;
 		}
@@ -520,13 +518,6 @@ got:
 	if (S_ISDIR(mode)) {
 		
 	}
-
-/* jy
-	if (sb->s_flags & SB_SYNCHRONOU)
-		sbh_sync_block();
-*/
-//jy	
-//	sfs_mark_sb_dirty(sb);
 
 	inode->i_ino = ino;
 	inode_init_owner(inode, dir, mode);
@@ -557,7 +548,6 @@ got:
 	sfs_inode->i_ctime_nsec = cpu_to_le32(ts.tv_nsec);
 	mark_buffer_dirty(bh);
 	unlock_buffer(bh);
-// jy	
 //	if (sb->s_flags & SB_SYNCHRONOUS)
 		sync_dirty_buffer(bh);
 	brelse(bh);
@@ -580,6 +570,7 @@ failed:
 
 int sfs_add_link(struct dentry *dentry, struct inode *inode)
 {
+
 	//jy
 	return 0;
 }
@@ -616,6 +607,124 @@ static int sfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, bo
 	mark_inode_dirty(inode);
 	printk(KERN_ERR "jy: create1\n");
 	return sfs_add_nondir(dentry, inode);
+}
+
+static int sfs_commit_chunk(struct page *page, loff_t pos, unsigned len)
+{
+	struct address_space *mapping = page->mapping;
+	struct inode *dir = mapping->host;
+	int err = 0;
+
+	inode_inc_iversion(dir);
+	block_write_end(NULL, mapping, pos, len, len, page, NULL);
+
+	if (pos + len > dir->i_size) {
+		i_size_write(dir, pos + len);
+		mark_inode_dirty(dir);
+	}
+
+	if (IS_DIRSYNC(dir)) {
+		err = write_one_page(page);
+		if (!err)
+			err = sync_inode_metadata(dir, 1);
+	} else {
+		unlock_page(page);
+	}
+
+	return err;
+}
+
+int sfs_make_empty(struct inode *inode, struct inode *dir)
+{
+	struct address_space *mapping = inode->i_mapping;
+	struct page *page = grab_cache_page(mapping, 0);
+	struct sfs_dir_entry *de;
+	void *kaddr;
+	int err;
+
+	printk(KERN_ERR "jy: make_empty\n");
+	if (!page)
+		return -ENOMEM;
+
+	printk(KERN_ERR "jy: make_empty0\n");
+	err = sfs_prepare_chunk(page, 0, SFS_BLKSIZE);
+	if (err) {
+		unlock_page(page);
+		goto fail;
+	}
+
+	printk(KERN_ERR "jy: make_empty1\n");
+	kaddr = kmap_atomic(page);
+	memset(kaddr, 0, PAGE_SIZE);
+
+	de = (struct sfs_dir_entry *)kaddr;
+	de->name_len = 1;
+	de->rec_len = cpu_to_le16(SFS_DIR_REC_LEN(1));
+	memcpy(de->name, ".\0\0", 4);
+	de->inode = cpu_to_le32(inode->i_ino);
+	de->file_type = fs_umode_to_ftype(inode->i_mode);
+
+	de = (struct sfs_dir_entry *)(kaddr + SFS_DIR_REC_LEN(1));
+	de->name_len = 2;
+	de->rec_len = cpu_to_le16(SFS_BLKSIZE - SFS_DIR_REC_LEN(2));
+	memcpy(de->name, "..\0", 4);
+	de->inode = cpu_to_le32(dir->i_ino);
+	de->file_type = fs_umode_to_ftype(inode->i_mode);
+
+	printk(KERN_ERR "jy: make_empty2\n");
+	kunmap_atomic(kaddr);
+	err = sfs_commit_chunk(page, 0, SFS_BLKSIZE);
+fail:
+	printk(KERN_ERR "jy: make_empty3\n");
+	put_page(page);
+	return err;
+}
+
+static int sfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
+{
+	struct inode *inode;
+	int err;
+
+	printk(KERN_ERR "jy: mkdir\n");
+	inode_inc_link_count(dir);
+
+	inode = sfs_new_inode(dir, S_IFDIR|mode);
+	printk(KERN_ERR "jy: mkdir0\n");
+	err = PTR_ERR(inode);
+	if (IS_ERR(inode))
+		goto out_dir;
+	
+	printk(KERN_ERR "jy: mkdir1\n");
+	inode->i_op = &sfs_dir_inode_operations;
+	inode->i_fop = &sfs_dir_operations;
+	inode->i_mapping->a_ops = &sfs_aops;
+
+	inode_inc_link_count(inode);
+
+	printk(KERN_ERR "jy: mkdir2\n");
+	err = sfs_make_empty(inode, dir);
+	if (err)
+		goto out_fail;
+
+	printk(KERN_ERR "jy: mkdir3\n");
+	err = sfs_add_link(dentry, inode);
+	if (err)
+		goto out_fail;
+
+	printk(KERN_ERR "jy: mkdir4\n");
+	d_instantiate_new(dentry, inode);
+	return 0;
+
+out_fail:
+	printk(KERN_ERR "jy: mkdir5\n");
+	inode_dec_link_count(inode);
+	inode_dec_link_count(inode);
+	discard_new_inode(inode);
+
+out_dir:
+	printk(KERN_ERR "jy: mkdir6\n");
+	inode_dec_link_count(dir);
+	return err;
 }
 
 ino_t sfs_inode_by_name(struct inode *dir, const struct qstr *qstr)
@@ -686,7 +795,7 @@ int sfs_setattr(struct dentry *dentry, struct iattr *attr)
 	return error;
 }
 
-struct inode_operations sfs_dir_inode_operations = {
+const struct inode_operations sfs_dir_inode_operations = {
 	.lookup         = sfs_lookup,
 	.create		= sfs_create,
 /*
@@ -774,7 +883,7 @@ static int sfs_readdir(struct file *file, struct dir_context *ctx)
 	return 0;
 }
 
-struct file_operations sfs_dir_operations = {
+const struct file_operations sfs_dir_operations = {
         .llseek         = generic_file_llseek,
         .read           = generic_read_dir,
 	.fsync          = generic_file_fsync,
