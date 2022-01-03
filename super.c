@@ -43,7 +43,7 @@ void sfs_msg(const char *level, const char *funtion, const char *fmt, ...)
 	va_start(args, fmt);
 	vaf.fmt = fmt;
 	vaf.va = &args;
-	printk("%sSFS (%s): %pV\n", level, funtion, &vaf);
+	printk("%sSFS(%s): %pV\n", level, funtion, &vaf);
 	va_end(args);
 }
 
@@ -183,56 +183,70 @@ static inline int verify_chain(Indirect *from, Indirect *to)
 	return (from > to);
 }
 
-static unsigned int sfs_map(struct inode *inode, unsigned int offsets[4], int depth)
+static unsigned int sfs_map(struct inode *inode, unsigned int *offsets, int depth)
 {
 	struct sfs_inode_info *si = SFS_I(inode);
 	struct super_block *sb = inode->i_sb;
-	struct sfs_sb_info *sbi = SFS_SB(sb);
+	Indirect chain[4], *p = chain;
 	struct buffer_head *bh;
-	unsigned int ret, *p;
-	Indirect chain[4], *q = chain;
+	unsigned int ret = 0;
 
-	if (depth == 0)
+	printk(KERN_ERR "jy: sfs_map %d\n", si->i_data[0]);
+	add_chain(chain, NULL, si->i_data + *offsets);
+	if (!p->key)
 		goto no_block;
-
-	p = offsets;
-
-	ret = si->i_data[*p++];
-
 	while (--depth) {
-		bh = sb_bread(sb, sbi->data_blkaddr + *p++);
+		printk(KERN_ERR "jy: sfs_map0\n");
+		bh = sb_bread(sb, le32_to_cpu(p->key));
 		if (!bh)
+			return -EIO;
+		if (!verify_chain(chain, p))
+			goto changed;
+		add_chain(++p, bh, (__le32*)bh->b_data + *++offsets);
+		printk(KERN_ERR "jy: sfs_map1 %n\n", (__le32 *)bh->b_data + *offsets);
+		if (!p->key)
 			goto no_block;
-		
 	}
+	printk(KERN_ERR "jy: sfs_map2\n");
+	ret = le32_to_cpu(p->key);
 
 no_block:
-	return le32_to_cpu(ret);
+	while (p > chain) {
+		brelse(p->bh);
+		p--;
+	}
+	printk(KERN_ERR "jy: sfs_map3\n");
+	return ret;
+
+changed:
+	printk(KERN_ERR "jy: sfs_map4\n");
+	return -EAGAIN;
 }
 
 static int sfs_get_block(struct inode *inode, sector_t iblock,
 		struct buffer_head *bh_result, int create)
 {
 	struct super_block *sb = inode->i_sb;
-	unsigned int offsets[4];
+	unsigned int offsets[4] = {0};
 	unsigned int blkno;
 	int depth;
 	
+	printk(KERN_ERR "jy: get_block %lld, %d\n", iblock, create);
 	depth = sfs_block_to_path(iblock, offsets);
+	printk(KERN_ERR "jy: get_block0 %d %u %u %u %u\n", depth, offsets[0], offsets[1], offsets[2], offsets[3]);
 	if (depth == 0)
 		return -EIO;
 
 	blkno = sfs_map(inode, offsets, depth);
-	printk(KERN_ERR "jy: get_block %lld, %d\n", iblock, create);
+	printk(KERN_ERR "jy: get_block1 %u\n", blkno);
+	if (blkno < 0)
+		return blkno;
 
 	if (!create)
 		goto done;
-	
-
 		
 done:
-	map_bh(bh_result, sb, 0x80a);
-//	map_bh(bh_result, sb, blkno);
+	map_bh(bh_result, sb, blkno);
 
 	return 0;
 }
@@ -346,7 +360,6 @@ static inline struct sfs_dir_entry *sfs_next_entry(struct sfs_dir_entry *p)
 
 struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr, struct page **res_page)
 {
-	struct super_block *sb = dir->i_sb;
 	const unsigned char *name = qstr->name;
 	int namelen = qstr->len;
 	unsigned reclen = SFS_DIR_REC_LEN(namelen);
@@ -443,28 +456,66 @@ struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 {
 	struct super_block *sb;
 	struct sfs_sb_info *sbi;
+	struct buffer_head *bitmap_bh = NULL;
+	struct buffer_head *bh;
+	unsigned i, j, start;
+	ino_t ino = 0;
 	struct inode *inode;
 	struct sfs_inode_info *si;
 	struct sfs_inode *sfs_inode;
-	struct sfs_bmap_info *im_i;
-	struct buffer_head *bh;
 	struct timespec64 ts;
-	unsigned cg, bit, i, j, start;
 	int err = -ENOSPC;
 
+	printk(KERN_ERR "jy: new_inode\n");
+
+#if 0	
 	if (!dir || !dir->i_nlink)
 		return ERR_PTR(-EPERM);
+#endif
+	printk(KERN_ERR "jy: new_inode0.1\n");
 	sb = dir->i_sb;
 	inode = new_inode(sb);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
+	printk(KERN_ERR "jy: new_inode0.2\n");
 	si = SFS_I(inode);
 	sbi = SFS_SB(sb);
 
 	
 	//jy
 
-	im_i = sfs_load_imap(sb);
+	for (i = 0; i < sfs_get(blkcnt_imap); i++) {
+		brelse(bitmap_bh);
+		printk(KERN_ERR "jy: new_inode0 %d\n", sfs_get(imap_blkaddr) + i);
+		bitmap_bh = sb_bread(sb, sfs_get(imap_blkaddr) + i);
+		if (!bitmap_bh) {
+			err = -EIO;
+			goto failed;
+		}
+		ino = 0;
+
+		ino = find_next_zero_bit_le(bitmap_bh->b_data, SFS_BLKSIZE, 0);
+		printk(KERN_ERR "jy: new_inode1 %d\n", ino);
+		if (ino > sfs_get(blkcnt_inode) + SFS_ROOT_INO) {
+			err = -EIO;
+			goto failed;
+		}
+		goto got;
+	}
+	printk(KERN_ERR "jy: new_inode2\n");
+	brelse(bitmap_bh);
+	err = -ENOSPC;
+	goto failed;
+
+got:
+	printk(KERN_ERR "jy: new_inode3\n");
+	mark_buffer_dirty(bitmap_bh);
+//	if (sb->s_flags & SB_SYNCHRONOUS)
+		sync_dirty_buffer(bitmap_bh);
+	brelse(bitmap_bh);
+
+	ino += SFS_ROOT_INO;
+	printk(KERN_ERR "jy: new_inode3.5 %d\n", ino);
 
 	if (S_ISDIR(mode)) {
 		
@@ -477,7 +528,7 @@ struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 //jy	
 //	sfs_mark_sb_dirty(sb);
 
-	inode->i_ino = bit;
+	inode->i_ino = ino;
 	inode_init_owner(inode, dir, mode);
 	inode->i_blocks = 0;
 	inode->i_generation = 0;
@@ -485,6 +536,7 @@ struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 	si->i_flags = SFS_I(dir)->i_flags;
 	si->i_dir_start_lookup = 0;
 	memset(&si->i_data, 0, sizeof(si->i_data));
+	printk(KERN_ERR "jy: new_inode4\n");
 	if (insert_inode_locked(inode) < 0) {
 		err = -EIO;
 		goto failed;
@@ -492,11 +544,13 @@ struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 	mark_inode_dirty(inode);
 
 	bh = sb_bread(sb, sfs_inotoba(inode->i_ino));
+	printk(KERN_ERR "jy: new_inode5\n");
 	if (!bh) {
 		sfs_msg(KERN_ERR, "sfs_new_inode", "Failed to read inode %lu\n", inode->i_ino);
 		err = -EIO;
 		goto fail_remove_inode;
 	}
+	printk(KERN_ERR "jy: new_inode6\n");
 	sfs_inode = (struct sfs_inode *)bh->b_data;
 	ktime_get_real_ts64(&ts);
 	sfs_inode->i_ctime = cpu_to_le64(ts.tv_sec);
@@ -508,14 +562,17 @@ struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 		sync_dirty_buffer(bh);
 	brelse(bh);
 
+	printk(KERN_ERR "jy: new_inode7\n");
 	return inode;
 
 fail_remove_inode:
+	printk(KERN_ERR "jy: new_inode8\n");
 	clear_nlink(inode);
 	discard_new_inode(inode);
 	return ERR_PTR(err);
 
 failed:
+	printk(KERN_ERR "jy: new_inode9\n");
 	make_bad_inode(inode);
 	iput(inode);
 	return ERR_PTR(err);
@@ -530,27 +587,34 @@ int sfs_add_link(struct dentry *dentry, struct inode *inode)
 static inline int sfs_add_nondir(struct dentry *dentry, struct inode *inode)
 {
 	int err = sfs_add_link(dentry, inode);
+	printk(KERN_ERR "jy: add_nondir\n");
 	if (!err) {
 		d_instantiate_new(dentry, inode);
 		return 0;
 	}
+	printk(KERN_ERR "jy: add_nondir1\n");
 	inode_dec_link_count(inode);
+	printk(KERN_ERR "jy: add_nondir2\n");
 	discard_new_inode(inode);
+	printk(KERN_ERR "jy: add_nondir3\n");
 	return err;
 }
 
 static int sfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, bool excl)
 {
 	struct inode *inode;
-
+	
+	printk(KERN_ERR "jy: create\n");
 	inode = sfs_new_inode(dir, mode);
 	if (IS_ERR(inode))
 		return PTR_ERR(inode);
+	printk(KERN_ERR "jy: create0\n");
 
 	inode->i_op = &sfs_file_inode_operations;
 	inode->i_fop = &sfs_file_operations;
 	inode->i_mapping->a_ops = &sfs_aops;
 	mark_inode_dirty(inode);
+	printk(KERN_ERR "jy: create1\n");
 	return sfs_add_nondir(dentry, inode);
 }
 
@@ -623,25 +687,16 @@ int sfs_setattr(struct dentry *dentry, struct iattr *attr)
 }
 
 struct inode_operations sfs_dir_inode_operations = {
-/*
-	.create		= sfs_create,
-*/	
 	.lookup         = sfs_lookup,
+	.create		= sfs_create,
 /*
+	.mkdir          = sfs_mkdir,
 	.link           = sfs_link,
 	.unlink         = sfs_unlink,
 	.symlink        = sfs_symlink,
-	.mkdir          = sfs_mkdir,
 	.rmdir          = sfs_rmdir,
 	.mknod          = sfs_mknod,
 	.rename         = sfs_rename,
-	.getattr        = sfs_getattr,
-*/	
-	.setattr        = sfs_setattr,
-/*
-	.get_acl        = sfs_get_acl,
-	.set_acl        = sfs_set_acl,
-	.tmpfile        = sfs_tmpfile,
 */	
 };
 
@@ -659,7 +714,6 @@ static int sfs_readdir(struct file *file, struct dir_context *ctx)
 {
 	loff_t pos = ctx->pos;
 	struct inode *inode = file_inode(file);
-	struct super_block *sb = inode->i_sb;
 	unsigned int offset = pos & ~PAGE_MASK;
 	unsigned long n = pos >> PAGE_SHIFT;
 	unsigned long npages = dir_pages(inode);
@@ -768,7 +822,6 @@ const struct file_operations sfs_file_operations = {
 
 static void sfs_fill_inode(struct inode *inode, struct sfs_inode *sfs_inode)
 {
-	struct super_block *sb = inode->i_sb;
 	struct sfs_inode_info *si = SFS_I(inode);
 
 	sfs_inode->i_mode = cpu_to_le16(inode->i_mode);
@@ -794,9 +847,8 @@ static void sfs_fill_inode(struct inode *inode, struct sfs_inode *sfs_inode)
 		memset(sfs_inode, 0, sizeof(struct sfs_inode));
 }
 
-static sfs_update_inode(struct inode *inode, int do_sync) {
+static int sfs_update_inode(struct inode *inode, int do_sync) {
 	struct super_block *sb = inode->i_sb;
-	struct sfs_sb_info *sbi = SFS_SB(sb);
 	struct sfs_inode *sfs_inode;
 	struct buffer_head *bh;
 
@@ -895,6 +947,8 @@ free_im_i:
 
 static int sfs_read_inode(struct inode *inode, struct sfs_inode *sfs_inode)
 {       
+	struct sfs_inode_info *si = SFS_I(inode);
+	
 	printk(KERN_ERR "jy: read_inode\n");
 
 	inode->i_mode = le16_to_cpu(sfs_inode->i_mode);
@@ -908,14 +962,7 @@ static int sfs_read_inode(struct inode *inode, struct sfs_inode *sfs_inode)
 	inode->i_atime.tv_nsec = inode->i_mtime.tv_nsec = inode->i_ctime.tv_nsec = 0;
 	inode->i_blocks = le32_to_cpu(sfs_inode->i_blocks);
 
-	if (S_ISREG(inode->i_mode)) {
-
-	} else if (S_ISDIR(inode->i_mode)) {
-		inode->i_op = &sfs_dir_inode_operations;
-		inode->i_fop = &sfs_dir_operations;
-	} else {
-
-	}
+	memcpy(si->i_data, sfs_inode->i_daddr, sizeof(si->i_data));
 
 	return 0;
 }
@@ -939,7 +986,7 @@ struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
 	struct sfs_inode *sfs_inode;
 	struct buffer_head *bh;
 	struct inode *inode;
-	int err;
+	int err = -EIO;
 
 	printk(KERN_ERR "jy: iget %ld\n", ino);
 	inode = iget_locked(sb, ino);
@@ -979,7 +1026,7 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 	struct sfs_sb_info *sbi;
 	struct inode *root;
 	int valid_super_block;
-	int ret;
+	int ret = -EIO;
 
 	raw_super = NULL;
 

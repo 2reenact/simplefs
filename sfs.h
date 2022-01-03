@@ -77,6 +77,7 @@ static inline struct sfs_bmap_info *SFS_IM_I(struct sfs_sb_info *sbi)
 	return sbi->im_i;
 }
 
+#define sfs_get(x)			(sbi->x)
 #define sfs_inotoba(x)			(((struct sfs_sb_info *)(sb->s_fs_info))->inode_blkaddr + x - SFS_ROOT_INO)
 
 #define SBH_MAX_BH		32
@@ -92,6 +93,7 @@ struct sfs_bmap_info {
 
 	unsigned int b_start_lookup;
 };
+
 
 
 
