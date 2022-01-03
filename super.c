@@ -36,6 +36,7 @@ const struct file_operations sfs_file_operations;
 const struct inode_operations sfs_dir_inode_operations;
 const struct file_operations sfs_dir_operations;
 
+static int sfs_commit_chunk(struct page *page, loff_t pos, unsigned len);
 
 void sfs_msg(const char *level, const char *funtion, const char *fmt, ...)
 {
@@ -370,7 +371,7 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 	printk(KERN_ERR "jy: find_entry %s, %ld\n", name, dir->i_ino);
 
 	if (npages == 0 || namelen > SFS_MAXNAME_LEN)
-		goto out;
+		goto out_find_entry;
 
 	*res_page = NULL;
 
@@ -390,11 +391,11 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 				if (de->rec_len == 0) {
 					sfs_msg(KERN_ERR, "sfs_find_entry", "zero-length diretory entry");
 					sfs_put_page(page);
-					goto out;
+					goto out_find_entry;
 				}
 				printk(KERN_ERR "jy: find_entry4: %d %s\n", de->inode, de->name);
 				if (sfs_match(namelen, name, de))
-					goto found;
+					goto entry_found;
 				de = sfs_next_entry(de);
 			}
 			sfs_put_page(page);
@@ -404,10 +405,10 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 	} while (n != start);
 	printk(KERN_ERR "jy: find_entry5\n");
 
-out:
+out_find_entry:
 	return NULL;
 
-found:
+entry_found:
 	printk(KERN_ERR "jy: find_entry6\n");
 	*res_page = page;
 	si->i_dir_start_lookup = n;
@@ -546,9 +547,92 @@ failed:
 
 int sfs_add_link(struct dentry *dentry, struct inode *inode)
 {
+	struct inode *dir = d_inode(dentry->d_parent);
+	const char *name = dentry->d_name.name;
+	int namelen = dentry->d_name.len;
+	unsigned reclen = SFS_DIR_REC_LEN(namelen);
+	unsigned short rec_len, name_len;
+	struct page *page = NULL;
+	struct sfs_dir_entry *de;
+	unsigned long npages = dir_pages(dir);
+	unsigned long n;
+	char *kaddr;
+	loff_t pos;
+	int err;
 
-	//jy
-	return 0;
+	for (n = 0; n <= npages; n++) {
+		char *dir_end;
+
+		page = sfs_get_page(dir, n);
+		err = PTR_ERR(page);
+		if (IS_ERR(page))
+			goto out_add_link;
+		lock_page(page);
+		kaddr = page_address(page);
+		dir_end = kaddr + sfs_last_byte(dir, n);
+		de = (struct sfs_dir_entry *)kaddr;
+		kaddr += PAGE_SIZE - reclen;
+		while ((char *)de <= kaddr) {
+			if ((char *)de == dir_end) {
+				name_len = 0;
+				rec_len = SFS_BLKSIZE;
+				de->rec_len = cpu_to_le16(SFS_BLKSIZE);
+				de->inode = 0;
+				goto got_it;
+			}
+			if (de->rec_len == 0) {
+				sfs_msg(KERN_ERR, "sfs_add_link", "zero-length directory entry");
+				err = -EIO;
+				goto out_unlock;
+			}	
+			err = -EEXIST;
+			if (sfs_match(namelen, name, de))
+				goto out_unlock;
+			name_len = SFS_DIR_REC_LEN(de->name_len);
+			rec_len = le16_to_cpu(de->rec_len);
+			if (!de->inode && rec_len >= reclen)
+				goto got_it;
+			if (rec_len >= name_len + reclen)
+				goto got_it;
+			de = (struct sfs_dir_entry *)((char *)de + rec_len);
+		}
+		unlock_page(page);
+		sfs_put_page(page);
+	}
+	return -EINVAL;
+
+got_it:
+	pos = page_offset(page) + (char *)de - (char *)page_address(page);
+	err = sfs_prepare_chunk(page, pos, rec_len);
+	if (err)
+		goto out_unlock;
+	if (de->inode) {
+		struct sfs_dir_entry *del = (struct sfs_dir_entry *)((char *)de + name_len);
+		del->rec_len = cpu_to_le16(rec_len - name_len);
+		de->rec_len = cpu_to_le16(name_len);
+
+		de = del;
+	}
+
+	de->name_len = namelen;
+	memcpy(de->name, name, namelen + 1);
+	de->inode = cpu_to_le32(inode->i_ino);
+	de->file_type = inode->i_mode;
+
+	err = sfs_commit_chunk(page, pos, rec_len);
+	dir->i_mtime = dir->i_ctime = current_time(dir);
+
+	mark_inode_dirty(dir);
+
+out_put:
+	sfs_put_page(page);
+
+out_add_link:
+	return err;
+
+out_unlock:
+	unlock_page(page);
+	goto out_put;
 }
 
 static inline int sfs_add_nondir(struct dentry *dentry, struct inode *inode)
@@ -572,6 +656,9 @@ static int sfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, bo
 	struct inode *inode;
 	
 	printk(KERN_ERR "jy: create\n");
+	if (dentry->d_name.name)
+		printk(KERN_ERR " %s", dentry->d_name.name);
+	printk(KERN_ERR "\n");
 	inode = sfs_new_inode(dir, mode);
 	if (IS_ERR(inode))
 		return PTR_ERR(inode);
@@ -1186,11 +1273,11 @@ static int __init init_sfs_fs(void)
 		goto out1;
 	err = register_filesystem(&sfs_fs_type);
 	if (err)
-		goto out;
+		goto out2;
 	
 	return 0;
 
-out:
+out2:
 	destroy_inode_cache();
 
 out1:

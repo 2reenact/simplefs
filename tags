@@ -49,7 +49,7 @@ PAGE_CACHE_SIZE	sfs_fs.h	19;"	d
 PAGE_SIZE	mkfs/sfs_fs.h	162;"	d
 PAGE_SIZE	sfs_fs.h	17;"	d
 PWD	Makefile	/^PWD	= $(shell pwd)$/;"	m
-SBH_MAX_BH	sfs.h	82;"	d
+SBH_MAX_BH	sfs.h	83;"	d
 SFS_BLKSIZE	mkfs/sfs_fs.h	241;"	d
 SFS_BLKSIZE	sfs_fs.h	78;"	d
 SFS_BLKSIZE_BITS	mkfs/sfs_fs.h	170;"	d
@@ -244,7 +244,6 @@ imap_blkaddr	sfs.h	/^        unsigned int imap_blkaddr;$/;"	m	struct:sfs_sb_info
 imap_blkaddr	sfs_fs.h	/^        __le32 imap_blkaddr;            \/* start block address of inode bmap *\/$/;"	m	struct:sfs_super_block
 indirect_node	mkfs/sfs_fs.h	/^struct indirect_node {$/;"	s
 indirect_node	sfs_fs.h	/^struct indirect_node {$/;"	s
-init_im_info	super.c	/^static int init_im_info(struct sfs_sb_info *sbi)$/;"	f	file:
 init_inode_cache	super.c	/^static int __init init_inode_cache(void)$/;"	f	file:
 init_once	super.c	/^static void init_once(void *foo)$/;"	f	file:
 init_sfs_fs	super.c	/^static int __init init_sfs_fs(void)$/;"	f	file:
@@ -319,6 +318,7 @@ sfs_bmap	super.c	/^static sector_t sfs_bmap(struct address_space *mapping, secto
 sfs_bmap_info	sfs.h	/^struct sfs_bmap_info {$/;"	s
 sfs_buffer_head	sfs.h	/^struct sfs_buffer_head {$/;"	s
 sfs_clear_bit	mkfs/mkfs_lib.c	/^int sfs_clear_bit(unsigned int nr, char *addr)$/;"	f
+sfs_commit_chunk	super.c	/^static int sfs_commit_chunk(struct page *page, loff_t pos, unsigned len)$/;"	f	file:
 sfs_configuration	mkfs/sfs_fs.h	/^struct sfs_configuration {$/;"	s
 sfs_configuration	sfs_fs.h	/^struct sfs_configuration {$/;"	s
 sfs_create	super.c	/^static int sfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, bool excl)$/;"	f	file:
@@ -327,8 +327,10 @@ sfs_dentry_block	mkfs/sfs_fs.h	/^struct sfs_dentry_block {$/;"	s
 sfs_dev_is_mounted	mkfs/mkfs_lib.c	/^int sfs_dev_is_mounted(void)$/;"	f
 sfs_dir_entry	mkfs/sfs_fs.h	/^struct sfs_dir_entry {$/;"	s
 sfs_dir_entry	sfs_fs.h	/^struct sfs_dir_entry {$/;"	s
-sfs_dir_inode_operations	super.c	/^struct inode_operations sfs_dir_inode_operations = {$/;"	v	typeref:struct:inode_operations
-sfs_dir_operations	super.c	/^struct file_operations sfs_dir_operations = {$/;"	v	typeref:struct:file_operations
+sfs_dir_inode_operations	super.c	/^const struct inode_operations sfs_dir_inode_operations = {$/;"	v	typeref:struct:inode_operations
+sfs_dir_inode_operations	super.c	/^const struct inode_operations sfs_dir_inode_operations;$/;"	v	typeref:struct:inode_operations
+sfs_dir_operations	super.c	/^const struct file_operations sfs_dir_operations = {$/;"	v	typeref:struct:file_operations
+sfs_dir_operations	super.c	/^const struct file_operations sfs_dir_operations;$/;"	v	typeref:struct:file_operations
 sfs_file_inode_operations	super.c	/^const struct inode_operations sfs_file_inode_operations = {$/;"	v	typeref:struct:inode_operations
 sfs_file_inode_operations	super.c	/^const struct inode_operations sfs_file_inode_operations;$/;"	v	typeref:struct:inode_operations
 sfs_file_operations	super.c	/^const struct file_operations sfs_file_operations = {$/;"	v	typeref:struct:file_operations
@@ -339,6 +341,7 @@ sfs_find_entry	super.c	/^struct sfs_dir_entry *sfs_find_entry(struct inode *dir,
 sfs_format_device	mkfs/mkfs_format.c	/^int sfs_format_device(void)$/;"	f
 sfs_free_inode	super.c	/^static void sfs_free_inode(struct inode *inode)$/;"	f	file:
 sfs_fs_type	super.c	/^static struct file_system_type sfs_fs_type = {$/;"	v	typeref:struct:file_system_type	file:
+sfs_get	sfs.h	80;"	d
 sfs_get_block	super.c	/^static int sfs_get_block(struct inode *inode, sector_t iblock,$/;"	f	file:
 sfs_get_device_info	mkfs/mkfs_lib.c	/^int sfs_get_device_info(void)$/;"	f
 sfs_get_page	super.c	/^static struct page *sfs_get_page(struct inode *dir, unsigned long n)$/;"	f	file:
@@ -350,17 +353,19 @@ sfs_inode	sfs_fs.h	/^struct sfs_inode {$/;"	s
 sfs_inode_by_name	super.c	/^ino_t sfs_inode_by_name(struct inode *dir, const struct qstr *qstr)$/;"	f
 sfs_inode_cachep	super.c	/^static struct kmem_cache *sfs_inode_cachep;$/;"	v	typeref:struct:kmem_cache	file:
 sfs_inode_info	sfs.h	/^struct sfs_inode_info {$/;"	s
-sfs_inotoba	sfs.h	80;"	d
+sfs_inotoba	sfs.h	81;"	d
 sfs_last_byte	super.c	/^static unsigned sfs_last_byte(struct inode *inode, unsigned long page_nr)$/;"	f	file:
-sfs_load_imap	super.c	/^struct sfs_bmap_info *sfs_load_imap(struct super_block *sb)$/;"	f
 sfs_lookup	super.c	/^static struct dentry *sfs_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags)$/;"	f	file:
+sfs_make_empty	super.c	/^int sfs_make_empty(struct inode *inode, struct inode *dir)$/;"	f
 sfs_map	super.c	/^static unsigned int sfs_map(struct inode *inode, unsigned int *offsets, int depth)$/;"	f	file:
 sfs_match	super.c	/^static inline int sfs_match(int len, const unsigned char *name, struct sfs_dir_entry *de)$/;"	f	file:
+sfs_mkdir	super.c	/^static int sfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)$/;"	f	file:
 sfs_mount	super.c	/^static struct dentry *sfs_mount(struct file_system_type *fs_type, int flags,$/;"	f	file:
 sfs_msg	super.c	/^void sfs_msg(const char *level, const char *funtion, const char *fmt, ...)$/;"	f
 sfs_new_inode	super.c	/^struct inode *sfs_new_inode(struct inode *dir, umode_t mode)$/;"	f
 sfs_next_entry	super.c	/^static inline struct sfs_dir_entry *sfs_next_entry(struct sfs_dir_entry *p)$/;"	f	file:
 sfs_parse_options	mkfs/mkfs_main.c	/^static void sfs_parse_options(int argc, char *argv[])$/;"	f	file:
+sfs_prepare_chunk	super.c	/^int sfs_prepare_chunk(struct page *page, loff_t pos, unsigned len)$/;"	f
 sfs_prepare_super_block	mkfs/mkfs_format.c	/^static int sfs_prepare_super_block(void) {$/;"	f	file:
 sfs_put_page	super.c	/^static inline void sfs_put_page(struct page *page)$/;"	f	file:
 sfs_read_inode	super.c	/^static int sfs_read_inode(struct inode *inode, struct sfs_inode *sfs_inode)$/;"	f	file:
