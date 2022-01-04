@@ -37,6 +37,7 @@ struct sfs_sb_info {
         unsigned int blkcnt_dmap;
         unsigned int blkcnt_inode;
         unsigned int blkcnt_data;
+	unsigned long total_blkcnt;
 };
 
 #define SFS_GET_SB(s, i)		(SFS_SB(s)->raw_super->i)

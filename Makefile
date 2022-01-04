@@ -1,7 +1,6 @@
 NAME	= sfs
 KDIR	= /lib/modules/$(shell uname -r)/build
 PWD	= $(shell pwd)
-CFLAG	= -I$(src)
 
 obj-m		+= $(NAME).o
 

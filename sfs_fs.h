@@ -104,14 +104,13 @@ struct sfs_super_block {
 	char path[MAX_PATH_LEN];
 } __attribute__((packed));
 
-#define DEF_ADDRS_PER_INODE     12      /* Address Pointers in Inode */
-#define DEF_IADDRS_PER_INODE	3       /* Indirect Pointers in Inode */
-#define DEF_SFS_N_BLOCKS	(DEF_ADDRS_PER_INODE + DEF_IDPS_PER_INODE)
-#define DEF_ADDRS_PER_BLOCK     1024    /* Address Pointers in a Indirect Block */
-#define DEF_APB_SHIFT		10
-#define SFS_IND_BLOCK		DEF_ADDRS_PER_INODE + 0
-#define SFS_DIND_BLOCK		DEF_ADDRS_PER_INODE + 1
-#define SFS_TIND_BLOCK		DEF_ADDRS_PER_INODE + 2
+#define SFS_DIR_BLK_CNT		12      /* Address Pointers in Inode */
+#define SFS_IND_BLK_CNT		3       /* Indirect Pointers in Inode */
+#define SFS_NODE_PER_BLK	1024    /* Address Pointers in a Indirect Block */
+#define SFS_NODE_PER_BLK_BIT	10
+#define SFS_IND_BLK		SFS_DIR_BLK_CNT + 0
+#define SFS_DIND_BLK		SFS_DIR_BLK_CNT + 1
+#define SFS_TIND_BLK		SFS_DIR_BLK_CNT + 2
 
 #define SFS_MAXNAME_LEN		255
 
@@ -133,13 +132,13 @@ struct sfs_inode {
         __le32 i_flags;                 /* file attributes */
         __le32 i_pino;                  /* parent inode number */
 
-        __le32 i_daddr[DEF_ADDRS_PER_INODE];     /* Pointers to data blocks */
-        __le32 i_iaddr[DEF_IADDRS_PER_INODE];      /* indirect, double indirect,
+        __le32 i_daddr[SFS_DIR_BLK_CNT];     /* Pointers to data blocks */
+        __le32 i_iaddr[SFS_IND_BLK_CNT];      /* indirect, double indirect,
                                                 triple_indirect block address*/
 } __attribute__((packed));
 
 struct indirect_node {
-        __le32 addr[DEF_ADDRS_PER_BLOCK];       /* array of data block address */
+        __le32 addr[SFS_NODE_PER_BLK];       /* array of data block address */
 } __attribute__((packed));
 
 
