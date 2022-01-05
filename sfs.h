@@ -26,8 +26,9 @@ struct sfs_bmap_info;
 struct sfs_sb_info {
 	struct super_block *sb;				/* pointer to VFS super block */
 	struct sfs_super_block *raw_super;		/* raw super block pointer */
-	struct sfs_bmap_info *dm_i;
-	struct sfs_bmap_info *im_i;
+
+	unsigned int dmap_start_lookup;
+	unsigned int imap_start_lookup;
 
         unsigned int imap_blkaddr;
         unsigned int dmap_blkaddr;
@@ -68,34 +69,11 @@ static inline struct sfs_sb_info *SFS_SB(struct super_block *sb)
 	return sb->s_fs_info;
 }
 
-static inline struct sfs_bmap_info *SFS_DM_I(struct sfs_sb_info *sbi)
-{
-	return sbi->dm_i;
-}
-
-static inline struct sfs_bmap_info *SFS_IM_I(struct sfs_sb_info *sbi)
-{
-	return sbi->im_i;
-}
-
 #define sfs_get(x)			(sbi->x)
 #define sfs_inotoba(x)			(((struct sfs_sb_info *)(sb->s_fs_info))->inode_blkaddr + x - SFS_ROOT_INO)
+#define SFS_BITS_PER_BLK		BITS_PER_BYTE * SFS_BLKSIZE
+#define sfs_max_bit(x)			(SFS_BITS_PER_BLK * (x))
 
 #define SBH_MAX_BH		32
-
-struct sfs_buffer_head {
-	unsigned int count;
-
-	struct buffer_head *bh[SBH_MAX_BH];
-};
-
-struct sfs_bmap_info {
-	struct sfs_buffer_head b_sbh;
-
-	unsigned int b_start_lookup;
-};
-
-
-
 
 #endif /* _SFS_H */

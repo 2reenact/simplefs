@@ -204,6 +204,7 @@ static int sfs_write_root_inode(void)
 	raw_node->i_size = cpu_to_le64(1 * block_size_byte);
 	raw_node->i_blocks = cpu_to_le64(1);
 	raw_node->i_daddr[0] = get_sb(data_blkaddr);
+	raw_node->i_links = 1;
 
 	raw_node->i_atime = cpu_to_le64(time(NULL));
 	raw_node->i_atime_nsec = 0;
