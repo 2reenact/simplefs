@@ -186,15 +186,16 @@ static inline int verify_chain(Indirect *from, Indirect *to)
 	return (from > to);
 }
 
-static int sfs_find_branch(struct inode *inode, unsigned int *offsets, int depth)
+static Indirect *sfs_find_branch(struct inode *inode, Indirect *chain, unsigned int *offsets, int depth, int *err)
 {
-	struct sfs_inode_info *si = SFS_I(inode);
 	struct super_block *sb = inode->i_sb;
-	Indirect chain[4], *p = chain;
+	struct sfs_inode_info *si = SFS_I(inode);
+	Indirect *p = chain;
 	struct buffer_head *bh;
-	unsigned int ret = 0;
 
-	printk(KERN_ERR "jy: find_branch %d\n", si->i_data[0]);
+	printk(KERN_ERR "jy: find_branch %d %d\n", *offsets, *(si->i_data + *offsets));
+	*err = 0;
+
 	add_chain(chain, NULL, si->i_data + *offsets);
 	if (!p->key)
 		goto no_block;
@@ -202,7 +203,7 @@ static int sfs_find_branch(struct inode *inode, unsigned int *offsets, int depth
 		printk(KERN_ERR "jy: find_branch0\n");
 		bh = sb_bread(sb, le32_to_cpu(p->key));
 		if (!bh)
-			return -EIO;
+			goto failure;
 		if (!verify_chain(chain, p))
 			goto changed;
 		add_chain(++p, bh, (__le32*)bh->b_data + *++offsets);
@@ -211,91 +212,146 @@ static int sfs_find_branch(struct inode *inode, unsigned int *offsets, int depth
 			goto no_block;
 	}
 	printk(KERN_ERR "jy: find_branch2\n");
-	ret = le32_to_cpu(p->key);
-
-no_block:
-	while (p > chain) {
-		brelse(p->bh);
-		p--;
-	}
-	printk(KERN_ERR "jy: find_branch3\n");
-	return ret;
+	return NULL;
 
 changed:
+	printk(KERN_ERR "jy: find_branch3\n");
+	brelse(bh);
+	*err = -EAGAIN;
+	goto no_block;
+
+failure:
 	printk(KERN_ERR "jy: find_branch4\n");
-	return -EAGAIN;
+	*err = -EIO;
+
+no_block:
+	printk(KERN_ERR "jy: find_branch5\n");
+	return p;
 }
 
-static int sfs_alloc_branch(struct inode *inode, unsigned int *offsets)
+static int sfs_alloc_blocks(struct inode *inode, unsigned int *new_blocks, int indirect_blks, int *err)
 {
 	struct super_block *sb = inode->i_sb;
 	struct sfs_sb_info *sbi = SFS_SB(sb);
 	struct buffer_head *bitmap_bh = NULL;
-	struct buffer_head *bh;
-	struct sfs_inode *sfs_inode;
-	int bno = 0;
 	unsigned i;
-	int err;
+	int bno, ret = 0;
 
-	printk(KERN_ERR "jy: alloc_branch\n");
+	printk(KERN_ERR "jy: alloc_blocks\n");
+	*err = 0;
 
 	for (i = 0; i < sfs_get(blkcnt_dmap); i++) {
 		brelse(bitmap_bh);
-		printk(KERN_ERR "jy: alloc_branch0 %d\n", sfs_get(dmap_blkaddr) + i);
+		printk(KERN_ERR "jy: alloc_blocks0 %d\n", sfs_get(dmap_blkaddr) + i);
 		bitmap_bh = sb_bread(sb, sfs_get(dmap_blkaddr) + i);
 		if (!bitmap_bh) {
-			err = -EIO;
-			goto failed_alloc_branch;
+			*err = -EIO;
+			goto failed_alloc_blocks;
 		}
+find_next:
 		bno = 0;
 
 		bno = find_next_zero_bit_le(bitmap_bh->b_data, SFS_BLKSIZE, 0);
-		printk(KERN_ERR "jy: alloc_branch1 %d\n", bno);
-		if (bno > sfs_get(total_blkcnt)) {
-			brelse(bitmap_bh);
-			err = -ENOSPC;
-			goto failed_alloc_branch;
-		}
-		if (bno >= SFS_BLKSIZE * 8 * (i + 1))
+		printk(KERN_ERR "jy: alloc_blocks1 %d\n", bno);
+		if (bno >= sfs_max_bit(i + 1))
 			continue;
-		goto got_alloc_branch;
+		if (!test_and_set_bit_le(bno, bitmap_bh->b_data)) {
+			printk(KERN_ERR "jy: alloc_blocks1.1 %d %d\n", sfs_max_bit(i), sfs_max_bit(i) + bno);
+			*new_blocks++ = sfs_get(dmap_blkaddr) + sfs_max_bit(i) + bno;
+			printk(KERN_ERR "jy: alloc_blocks1.2 %d\n", *(new_blocks - 1));
+			ret++;
+			goto got_alloc_blocks;
+		}
 	}
-	printk(KERN_ERR "jy: alloc_branch2\n");
+	printk(KERN_ERR "jy: alloc_blocks2\n");
 	brelse(bitmap_bh);
-	err = -ENOSPC;
-	goto failed_alloc_branch;
+	*err = -ENOSPC;
+	goto failed_alloc_blocks;
 
-got_alloc_branch:
-	set_bit_le(bno, bitmap_bh->b_data);
-	bno += sfs_get(data_blkaddr);
+got_alloc_blocks:
+	printk(KERN_ERR "jy: alloc_blocks3\n");
 	mark_buffer_dirty(bitmap_bh);
 //	if (sb->s_flags & SB_SYNCHRONOUS)
 		sync_dirty_buffer(bitmap_bh);
+	if (indirect_blks--)
+		goto find_next;
 	brelse(bitmap_bh);
 
-//
-	bh = sb_bread(sb, sfs_inotoba(inode->i_ino));
-	printk(KERN_ERR "jy: alloc_banch2.1 %d\n", bno);
-	if (!bh) {
-		sfs_msg(KERN_ERR, "sfs_alloc_branch", "Failed to read inode %lu\n", inode->i_ino);
+#if 0
+	if (*(new_block - 1) > sfs_get(total_blkcnt)) {
+		brelse(bitmap_bh);
 		err = -EIO;
 		goto failed_alloc_branch;
 	}
-	printk(KERN_ERR "jy: alloc_branch2.2\n");
-	sfs_inode = (struct sfs_inode *)bh->b_data;
-	sfs_inode->i_daddr[0] = cpu_to_le32(bno);
-	mark_buffer_dirty(bh);
-	unlock_buffer(bh);
-//	if (sb->s_flags & SB_SYNCHRONOUS)
-		sync_dirty_buffer(bh);
-	brelse(bh);
-//
+#endif
+	return ret;
 
-	printk(KERN_ERR "jy: alloc_branch3\n");
-	return bno;
+failed_alloc_blocks:
+	printk(KERN_ERR "jy: alloc_branch4\n");
+	return ret;
+}
+
+void sfs_free_blocks(struct inode *inode, unsigned int block, unsigned int count)
+{
+	
+}
+
+static int sfs_alloc_branch(struct inode *inode, Indirect *branch, int indirect_blks, unsigned int *offsets, int depth)
+{
+	struct super_block *sb = inode->i_sb;
+	struct buffer_head *bh;
+	unsigned int new_blocks[4] = {0}; //
+	unsigned int current_block;
+	unsigned i, n, num;
+	int err;
+
+	printk(KERN_ERR "jy: alloc_branch\n");
+	num = sfs_alloc_blocks(inode, new_blocks, indirect_blks, &err);
+	if (err)
+		return err;
+
+	printk(KERN_ERR "jy: alloc_branch0 %d, %d, %d, %d\n", new_blocks[0], new_blocks[1], new_blocks[2], new_blocks[3]);
+	branch[0].key = cpu_to_le32(new_blocks[0]);
+	
+	for (n = 1; n <= indirect_blks; n++) {
+		printk(KERN_ERR "jy: alloc_branch1\n");
+		bh = sb_getblk(sb, new_blocks[n - 1]);
+		if (!bh) {
+			err = -ENOMEM;
+			goto failed_alloc_branch;
+		}
+		printk(KERN_ERR "jy: alloc_branch2\n");
+		branch[n].bh = bh;
+		lock_buffer(bh);
+		memset(bh->b_data, 0, SFS_BLKSIZE);
+		branch[n].p = (__le32 *)bh->b_data + offsets[n];
+		branch[n].key = cpu_to_le32(new_blocks[n]);
+		*branch[n].p = branch[n].key;
+		if (n == indirect_blks) {
+			current_block = new_blocks[n];
+			for (i = 1; i < num; i++) {
+				printk(KERN_ERR "jy: alloc_branch3\n");
+				*(branch[n].p + i) = cpu_to_le32(++current_block);
+			}
+		}
+		set_buffer_uptodate(bh);
+		unlock_buffer(bh);
+		mark_buffer_dirty_inode(bh, inode);
+		if (S_ISDIR(inode->i_mode) && IS_DIRSYNC(inode))
+			sync_dirty_buffer(bh);
+	}
+	printk(KERN_ERR "jy: alloc_branch4\n");
+	return err;
 
 failed_alloc_branch:
-	printk(KERN_ERR "jy: alloc_branch4\n");
+	printk(KERN_ERR "jy: alloc_branch5\n");
+	for (i = 1; i < n; i++)
+		bforget(branch[i].bh);
+	for (i = 0; i < indirect_blks; i++)
+		sfs_free_blocks(inode, new_blocks[i], 1);
+	sfs_free_blocks(inode, new_blocks[i], 1);
+	printk(KERN_ERR "jy: alloc_branch6\n");
+
 	return err;
 }
 
@@ -303,9 +359,11 @@ static int sfs_get_block(struct inode *inode, sector_t iblock,
 		struct buffer_head *bh_result, int create)
 {
 	struct super_block *sb = inode->i_sb;
-	unsigned int offsets[4] = {0};
+	unsigned int offsets[4] = {0};//
+	unsigned int bno, indirect_blks;
 	int depth; // = sfs_block_to_path(iblock, offsets);
-	int blkno;
+	Indirect chain[4], *partial;
+	int err;
 	
 //	printk(KERN_ERR "jy: get_block %lu, %lld, %ld, %d\n", inode->i_ino, iblock, bh_result->b_size, create);
 	printk(KERN_ERR "jy: get_block %lu, %lld, %d\n", inode->i_ino, iblock, create);
@@ -314,23 +372,38 @@ static int sfs_get_block(struct inode *inode, sector_t iblock,
 	if (depth == 0)
 		return -EIO;
 
-	blkno = sfs_find_branch(inode, offsets, depth);
-	printk(KERN_ERR "jy: get_block1 %u\n", blkno);
-	if (blkno < 0)
-		return blkno;
+	partial = sfs_find_branch(inode, chain, offsets, depth, &err);
+	printk(KERN_ERR "jy: get_block1\n");
+		//no allocation needed
+	if (!partial) {
 
-	if (!create)
-		goto done;
+		goto done_get_block;
+	}
 
-	blkno = sfs_alloc_branch(inode, offsets);
-	printk(KERN_ERR "jy: get_block1 %u\n", blkno);
-	if (blkno < 0)
-		return blkno;
+	if (!create || err == -EIO)
+		goto done_get_block;
+
+	indirect_blks = (chain + depth) - partial - 1;
+	printk(KERN_ERR "jy: get_block2 %d\n", indirect_blks);
+
+	err = sfs_alloc_branch(inode, partial, indirect_blks, offsets, depth);
+	printk(KERN_ERR "jy: get_block3\n");
+	if (err) {
+	}
 		
-done:
-	map_bh(bh_result, sb, blkno);
+	partial = chain + depth - 1;
 
-	return 0;
+done_get_block:
+	printk(KERN_ERR "jy: get_block4\n");
+	while (partial > chain) {
+		brelse(partial->bh);
+		partial--;
+	}
+	bno = le32_to_cpu(chain[depth - 1].key);
+	printk(KERN_ERR "jy: get_block5 %u\n", bno);
+	map_bh(bh_result, sb, bno);
+
+	return err;
 }
 
 static int sfs_writepage(struct page *page, struct writeback_control *wbc)
@@ -493,20 +566,6 @@ entry_found:
 	*res_page = page;
 	si->i_dir_start_lookup = n;
 	return de;
-}
-
-
-void sbh_sync_block(struct sfs_buffer_head *sbh)
-{
-	unsigned i;
-
-	if (sbh) {
-		for (i = 0; i < sbh->count; i++)
-			write_dirty_buffer(sbh->bh[i], 0);
-
-		for (i = 0; i < sbh->count; i++)
-			wait_on_buffer(sbh->bh[i]);
-	}
 }
 
 struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
