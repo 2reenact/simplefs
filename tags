@@ -302,8 +302,8 @@ set_sb_le64	sfs_fs.h	47;"	d
 sfs_add_default_dentry_root	mkfs/mkfs_format.c	/^static int sfs_add_default_dentry_root(void)$/;"	f	file:
 sfs_add_link	super.c	/^int sfs_add_link(struct dentry *dentry, struct inode *inode)$/;"	f
 sfs_add_nondir	super.c	/^static inline int sfs_add_nondir(struct dentry *dentry, struct inode *inode)$/;"	f	file:
-sfs_alloc_blocks	super.c	/^static sfs_alloc_blocks(struct sfs_sb_info *sbi, unsigned int *blocks, int blks)$/;"	f	file:
-sfs_alloc_branch	super.c	/^static int sfs_alloc_branch(struct inode *inode, Indirect *partial, int blks, unsigned int *offsets, int depth)$/;"	f	file:
+sfs_alloc_blocks	super.c	/^static int sfs_alloc_blocks(struct inode *inode, unsigned int *new_blocks, int indirect_blks, int blks, int *err)$/;"	f	file:
+sfs_alloc_branch	super.c	/^static int sfs_alloc_branch(struct inode *inode, Indirect *branch, int indirect_blks, unsigned int *offsets, int *count)$/;"	f	file:
 sfs_alloc_inode	super.c	/^static struct inode *sfs_alloc_inode(struct super_block *sb)$/;"	f	file:
 sfs_aops	super.c	/^const struct address_space_operations sfs_aops = {$/;"	v	typeref:struct:address_space_operations
 sfs_block_to_path	super.c	/^static int sfs_block_to_path(sector_t iblock, unsigned int offsets[4])$/;"	f	file:
@@ -331,6 +331,7 @@ sfs_fill_super	super.c	/^static int sfs_fill_super(struct super_block *sb, void 
 sfs_find_branch	super.c	/^static Indirect *sfs_find_branch(struct inode *inode, Indirect *chain, unsigned int *offsets, int depth, int *err)$/;"	f	file:
 sfs_find_entry	super.c	/^struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr, struct page **res_page)$/;"	f
 sfs_format_device	mkfs/mkfs_format.c	/^int sfs_format_device(void)$/;"	f
+sfs_free_blocks	super.c	/^void sfs_free_blocks(struct inode *inode, unsigned int block, unsigned int count)$/;"	f
 sfs_free_inode	super.c	/^static void sfs_free_inode(struct inode *inode)$/;"	f	file:
 sfs_fs_type	super.c	/^static struct file_system_type sfs_fs_type = {$/;"	v	typeref:struct:file_system_type	file:
 sfs_get	sfs.h	72;"	d
@@ -371,6 +372,7 @@ sfs_set_inode_ops	super.c	/^static void sfs_set_inode_ops(struct inode *inode)$/
 sfs_setattr	super.c	/^int sfs_setattr(struct dentry *dentry, struct iattr *attr)$/;"	f
 sfs_show_info	mkfs/mkfs_main.c	/^static void sfs_show_info(void) {$/;"	f	file:
 sfs_sops	super.c	/^static const struct super_operations sfs_sops = {$/;"	v	typeref:struct:super_operations	file:
+sfs_splice_branch	super.c	/^static void sfs_splice_branch(struct inode *inode, long block, Indirect *where, int num, int blks)$/;"	f	file:
 sfs_super_block	mkfs/sfs_fs.h	/^struct sfs_super_block {$/;"	s
 sfs_super_block	sfs_fs.h	/^struct sfs_super_block {$/;"	s
 sfs_test_bit	mkfs/mkfs_lib.c	/^int sfs_test_bit(unsigned int nr, const char *p)$/;"	f
