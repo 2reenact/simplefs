@@ -1,32 +1,19 @@
 /*
  * sfs.c
  *
- * Copyright 2020 Lee JeYeon., Dankook Univ.
+ * Copyright 2021 Lee JeYeon., Dankook Univ.
  *		2reenact@gmail.com
  *
  */
 
 #include <linux/module.h>
-#include <linux/string.h>
 #include <linux/fs.h>
-#include <linux/slab.h>
-#include <linux/init.h>
-#include <linux/blkdev.h>
-#include <linux/parser.h>
-#include <linux/random.h>
 #include <linux/buffer_head.h>
-#include <linux/exportfs.h>
 #include <linux/vfs.h>
-#include <linux/seq_file.h>
 #include <linux/mount.h>
-#include <linux/log2.h>
-#include <linux/quotaops.h>
-#include <linux/uaccess.h>
-#include <linux/dax.h>
 #include <linux/iversion.h>
 #include <linux/writeback.h>
 
-//#include <linux/sfs_fs.h>
 #include "sfs.h"
 
 struct inode *sfs_iget(struct super_block *sb, unsigned long ino);
@@ -244,10 +231,10 @@ static int sfs_alloc_blocks(struct inode *inode, unsigned int *new_blocks, int i
 	*err = 0;
 	target = blks + indirect_blks;
 
-	for (i = 0; i < sfs_get(blkcnt_dmap); i++) {
+	for (i = 0; i < SFS_GET_SB(blkcnt_dmap); i++) {
 		brelse(bitmap_bh);
-		printk(KERN_ERR "jy: alloc_blocks0 %d\n", sfs_get(dmap_blkaddr) + i);
-		bitmap_bh = sb_bread(sb, sfs_get(dmap_blkaddr) + i);
+		printk(KERN_ERR "jy: alloc_blocks0 %d\n", SFS_GET_SB(dmap_blkaddr) + i);
+		bitmap_bh = sb_bread(sb, SFS_GET_SB(dmap_blkaddr) + i);
 		if (!bitmap_bh) {
 			*err = -EIO;
 			goto failed_alloc_blocks;
@@ -260,7 +247,7 @@ find_next:
 		if (bno >= sfs_max_bit(i + 1))
 			continue;
 		if (!test_and_set_bit_le(bno, bitmap_bh->b_data)) {
-			*new_blocks++ = sfs_get(data_blkaddr) + sfs_max_bit(i) + bno;
+			*new_blocks++ = SFS_GET_SB(data_blkaddr) + sfs_max_bit(i) + bno;
 			printk(KERN_ERR "jy: alloc_blocks1.2 %x\n", *(new_blocks - 1));
 			ret++;
 			goto got_alloc_blocks;
@@ -405,10 +392,14 @@ static int sfs_get_block(struct inode *inode, sector_t iblock,
 		return -EIO;
 
 	partial = sfs_find_branch(inode, chain, offsets, depth, &err);
-	printk(KERN_ERR "jy: get_block1\n");
+	printk(KERN_ERR "jy: get_block1 %x\n", le32_to_cpu(chain[depth - 1].key));
 		//no allocation needed
 	if (!partial) {
+		if (!le32_to_cpu(chain[depth - 1].key)) {
+			bh_result = NULL;
 
+			return 0;
+		}
 		goto done_get_block;
 	}
 
@@ -574,7 +565,7 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 		page = sfs_get_page(dir, n);
 		if (!IS_ERR(page)) {
 			kaddr = page_address(page);
-			de = (struct sfs_dir_entry *)(kaddr + SFS_DENTRY_OFFSET);
+			de = (struct sfs_dir_entry *)kaddr;
 			kaddr += sfs_last_byte(dir, n) - reclen;
 			while ((char *) de <= kaddr) {
 				if (de->rec_len == 0) {
@@ -632,10 +623,10 @@ struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 	si = SFS_I(inode);
 	sbi = SFS_SB(sb);
 
-	for (i = 0; i < sfs_get(blkcnt_imap); i++) {
+	for (i = 0; i < SFS_GET_SB(blkcnt_imap); i++) {
 		brelse(bitmap_bh);
-		printk(KERN_ERR "jy: new_inode0.5 %d\n", sfs_get(imap_blkaddr) + i);
-		bitmap_bh = sb_bread(sb, sfs_get(imap_blkaddr) + i);
+		printk(KERN_ERR "jy: new_inode0.5 %d\n", SFS_GET_SB(imap_blkaddr) + i);
+		bitmap_bh = sb_bread(sb, SFS_GET_SB(imap_blkaddr) + i);
 		if (!bitmap_bh) {
 			err = -EIO;
 			goto failed;
@@ -664,7 +655,7 @@ got:
 	brelse(bitmap_bh);
 
 	printk(KERN_ERR "jy: new_inode3.5 %ld\n", ino);
-	if (ino < SFS_ROOT_INO || ino > sfs_get(blkcnt_inode) + SFS_ROOT_INO) {
+	if (ino < SFS_ROOT_INO || ino > SFS_GET_SB(blkcnt_inode) + SFS_ROOT_INO) {
 		sfs_msg(KERN_ERR, "sfs_new_inode", "rserved inode or inode > inodes count");
 		err = -EIO;
 		goto failed;

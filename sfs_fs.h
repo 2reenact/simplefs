@@ -1,7 +1,7 @@
 /*
  * sfs_fs.h
  *
- * Copyright 2020 Lee JeYeon., Dankook Univ.
+ * Copyright 2021 Lee JeYeon., Dankook Univ.
  *		2reenact@gmail.com
  *
  */
@@ -9,20 +9,12 @@
 #ifndef _SFS_FS_H
 #define _SFS_FS_H
 
-#include <linux/pagemap.h>
-#include <linux/types.h>
-
 /* these are defined in kernel */
 #ifndef PAGE_SIZE
 #define PAGE_SIZE		4096
 #endif
-#define PAGE_CACHE_SIZE		4096
 #define BITS_PER_BYTE		8
 #define SFS_SUPER_MAGIC		0x202005F5	/* SFS Magic Number */
-#define MAX_PATH_LEN		24
-
-#define SFS_BYTES_TO_BLK(bytes)    ((bytes) >> SFS_BLKSIZE_BITS)
-#define SFS_BLKSIZE_BITS	12
 
 struct sfs_configuration {
 	int heap;
@@ -73,15 +65,8 @@ struct sfs_configuration {
 			})
 
 #define SFS_SUPER_OFFSET		1024	/* byte-size offset */
-#define	DEFAULT_SECTOR_SIZE		512	/* sector size is 512 bytes */
-#define	DEFAULT_SECTORS_PER_BLOCK	8	
 #define SFS_BLKSIZE			4096	/* support only 4KB block */
-#define SFS_SECTOR_SIZE			9	/* 9 bits for 512 bytes */
-#define SFS_LOG_BLOCK_SIZE		12	/* 12 bits for 4KB */
-#define SFS_BLOCK_ALIGN(x)	(((x) + SFS_BLKSIZE - 1) / SFS_BLKSIZE)
-
-#define NULL_ADDR		0x0U
-#define NEW_ADDR		-1U
+#define MAX_PATH_LEN			32
 
 #define SFS_ROOT_INO		 3	/* Root inode */
 
@@ -153,22 +138,6 @@ struct sfs_dir_entry {
 #define SFS_DIR_PAD			4
 #define SFS_DIR_ROUND			(SFS_DIR_PAD - 1)
 #define SFS_DIR_REC_LEN(name_len)	(((name_len) + 8 + SFS_DIR_ROUND) & ~SFS_DIR_ROUND)
-#define SFS_MAX_REC_LEN			((1<<16) - 1)
-
-/* file types used in inode_info->flags */
-enum {
-        SFS_UNKNOWN,
-        SFS_REG_FILE,
-        SFS_DIR,
-};
-
-#define SFS_DENTRY_OFFSET		32
-
-#define SFS_IMAP_BLK_OFFSET		2	/* imap block offset is 1 */
-#define SFS_IMAP_BYTE_OFFSET		4096	/* imap byte offset is 4096 */
-#define MAP_SIZE_ALIGN(size)		((size) + SFS_BLKSIZE) / SFS_BLKSIZE
-
-#define SFS_NODE_RATIO			128	/* node : data ratio is 1 : 128 */
 
 #endif /* _SFS_FS_H */
 

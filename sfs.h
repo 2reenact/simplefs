@@ -1,7 +1,7 @@
 /*
  * sfs.h
  *
- * Copyright 2020 Lee JeYeon., Dankook Univ.
+ * Copyright 2021 Lee JeYeon., Dankook Univ.
  *		2reenact@gmail.com
  *
  */
@@ -9,20 +9,8 @@
 #ifndef _SFS_H
 #define _SFS_H
 
-#include <linux/fs.h>
-#include <linux/blockgroup_lock.h>
-#include <linux/percpu_counter.h>
-#include <linux/rbtree.h>
-
 #include "sfs_fs.h"
 
-#include <linux/dcache.h>
-
-struct sfs_bmap_info;
-
-/*
- * sfs super-block data in memory
- */
 struct sfs_sb_info {
 	struct super_block *sb;				/* pointer to VFS super block */
 	struct sfs_super_block *raw_super;		/* raw super block pointer */
@@ -41,14 +29,10 @@ struct sfs_sb_info {
 	unsigned long total_blkcnt;
 };
 
-#define SFS_GET_SB(s, i)		(SFS_SB(s)->raw_super->i)
-
-/*
- * Macro-instructions used to manage several block sizes
- */
-#define SFS_BLOCK_SIZE(s)		((s)->blocksize)
-#define SFS_BLOCK_SIZE_BITS(s)		((s)->blocksize_bits)
-#define SFS_INODE_SIZE(s)		(SFS_SB(s)->inode_size)
+#define SFS_GET_SB(i)			(sbi->i)
+#define sfs_inotoba(x)			(((struct sfs_sb_info *)(sb->s_fs_info))->inode_blkaddr + x - SFS_ROOT_INO)
+#define SFS_BITS_PER_BLK		BITS_PER_BYTE * SFS_BLKSIZE
+#define sfs_max_bit(x)			(SFS_BITS_PER_BLK * (x))
 
 struct sfs_inode_info {
 	__le32 i_data[15];
@@ -68,12 +52,5 @@ static inline struct sfs_sb_info *SFS_SB(struct super_block *sb)
 {
 	return sb->s_fs_info;
 }
-
-#define sfs_get(x)			(sbi->x)
-#define sfs_inotoba(x)			(((struct sfs_sb_info *)(sb->s_fs_info))->inode_blkaddr + x - SFS_ROOT_INO)
-#define SFS_BITS_PER_BLK		BITS_PER_BYTE * SFS_BLKSIZE
-#define sfs_max_bit(x)			(SFS_BITS_PER_BLK * (x))
-
-#define SBH_MAX_BH		32
 
 #endif /* _SFS_H */
