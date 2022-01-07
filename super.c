@@ -394,14 +394,8 @@ static int sfs_get_block(struct inode *inode, sector_t iblock,
 	partial = sfs_find_branch(inode, chain, offsets, depth, &err);
 	printk(KERN_ERR "jy: get_block1 %x\n", le32_to_cpu(chain[depth - 1].key));
 		//no allocation needed
-	if (!partial) {
-		if (!le32_to_cpu(chain[depth - 1].key)) {
-			bh_result = NULL;
-
-			return 0;
-		}
+	if (!partial)
 		goto done_get_block;
-	}
 
 	if (!create || err == -EIO)
 		goto done_get_block;
@@ -427,7 +421,10 @@ done_get_block:
 	}
 	bno = le32_to_cpu(chain[depth - 1].key);
 	printk(KERN_ERR "jy: get_block5 %x\n", bno);
-	map_bh(bh_result, sb, bno);
+	if (bno)
+		map_bh(bh_result, sb, bno);
+	else
+		bh_result = NULL;
 
 	return err;
 }
@@ -1012,14 +1009,130 @@ static struct dentry *sfs_lookup(struct inode *dir, struct dentry *dentry, unsig
 	return d_splice_alias(inode, dentry);
 }
 
-int sfs_getattr(const struct path *path, struct kstat *stat,
-		u32 request_mask, unsigned int query_flags)
+static int sfs_empty_dir(struct inode *inode)
 {
-	struct inode *inode = d_inode(path->dentry);
+	struct super_block *sb = inode->i_sb;
+	struct page *page = NULL;
+	unsigned long i, namelen, npages = dir_pages(inode);
+	struct sfs_dir_entry *de;
+	char *kaddr;
 
-	generic_fillattr(inode, stat);
+	for (i = 0; i < npages; i++) {
+		page = sfs_get_page(inode, i);
 
+		if (IS_ERR(page))
+			continue;
+
+		kaddr = page_address(page);
+		de = (struct sfs_dir_entry *)kaddr;
+		kaddr += sfs_last_byte(inode, i) - SFS_DIR_REC_LEN(1);
+
+		while ((char *)de <= kaddr) {
+			if (de->rec_len == 0) {
+				sfs_msg(KERN_ERR, "sfs_empty_dir", "zero-length directory entry");
+				goto not_empty;
+			}
+			if (de->inode) {
+				namelen = de->name_len;
+				if (de->name[0] != '.')
+					goto not_empty;
+				if (namelen > 2)
+					goto not_empty;
+				if (namelen < 2) {
+					if (inode->i_ino != le32_to_cpu(de->inode))
+						goto not_empty;
+				} else if (de->name[1] != '.')
+					goto not_empty;
+			}
+			de = sfs_next_entry(de);
+		}
+		sfs_put_page(page);
+	}
+	return 1;
+
+not_empty:
+	sfs_put_page(page);
 	return 0;
+}
+
+static int sfs_delete_entry(struct inode *inode, struct sfs_dir_entry *dir, struct page *page)
+{
+	struct super_block *sb = inode->i_sb;
+	char *kaddr = page_address(page);
+	unsigned from = ((char *)dir - kaddr) & ~(SFS_BLKSIZE - 1);
+	unsigned to = ((char *)dir - kaddr) + le16_to_cpu(dir->rec_len);
+	loff_t pos;
+	struct sfs_dir_entry *pde = NULL;
+	struct sfs_dir_entry *de = (struct sfs_dir_entry *)(kaddr + from);
+	int err;
+
+	printk(KERN_ERR "jy: delete_entry\n");
+
+	while ((char *)de < (char *)dir) {
+		if (de->rec_len == 0) {
+			sfs_msg(KERN_ERR, "sfs_delete_entry", "zero-lenth directory entry");
+			err = -EIO;
+			goto out_delete_entry;
+		}
+		pde = de;
+		de = sfs_next_entry(de);
+	}
+	if (pde)
+		from = (char *)pde - (char *)page_address(page);
+	
+	pos = page_offset(page) + from;
+	lock_page(page);
+	err = sfs_prepare_chunk(page, pos, to - from);
+	if (pde)
+		pde->rec_len = cpu_to_le16(to - from);
+	dir->inode = 0;
+	err = sfs_commit_chunk(page, pos, to - from);
+	inode->i_ctime = inode->i_mtime = current_time(inode);
+	mark_inode_dirty(inode);
+out_delete_entry:
+	sfs_put_page(page);
+	return err;
+}
+
+static int sfs_unlink(struct inode *dir, struct dentry *dentry)
+{
+	struct inode *inode = d_inode(dentry);
+	struct sfs_dir_entry *de;
+	struct page *page;
+	int err = -ENOENT;
+
+	printk(KERN_ERR "jy: unlink\n");
+	de = sfs_find_entry(dir, &dentry->d_name, &page);
+	if (!de)
+		goto out_unlink;
+	
+	err = sfs_delete_entry(dir, de, page);
+	if (err)
+		goto out_unlink;
+	
+	inode->i_ctime = dir->i_ctime;
+	inode_dec_link_count(inode);
+	err = 0;
+
+out_unlink:
+	return err;
+}
+
+static int sfs_rmdir(struct inode *dir, struct dentry *dentry)
+{
+	struct inode *inode = d_inode(dentry);
+	int err = -ENOTEMPTY;
+
+	printk(KERN_ERR "jy: rmdir\n");
+	if (sfs_empty_dir(inode)) {
+		err = sfs_unlink(dir, dentry);
+		if (!err) {
+			inode->i_size = 0;
+			inode_dec_link_count(inode);
+			inode_dec_link_count(dir);
+		}
+	}
+	return err;
 }
 
 int sfs_setattr(struct dentry *dentry, struct iattr *attr)
@@ -1046,13 +1159,13 @@ const struct inode_operations sfs_dir_inode_operations = {
 	.lookup         = sfs_lookup,
 	.create		= sfs_create,
 	.mkdir          = sfs_mkdir,
+	.rmdir          = sfs_rmdir,
 /*
+	.rename         = sfs_rename,
 	.link           = sfs_link,
 	.unlink         = sfs_unlink,
 	.symlink        = sfs_symlink,
-	.rmdir          = sfs_rmdir,
 	.mknod          = sfs_mknod,
-	.rename         = sfs_rename,
 */	
 };
 
