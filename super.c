@@ -76,11 +76,13 @@ static void init_once(void *foo)
 {
 	struct sfs_inode_info *si = (struct sfs_inode_info *) foo;
 
+	printk(KERN_ERR "jy: init_once\n");
 	inode_init_once(&si->vfs_inode);
 }
 
 static int __init init_inode_cache(void)
 {
+	printk(KERN_ERR "jy: init_inode_cache\n");
         sfs_inode_cachep = kmem_cache_create_usercopy("sfs_inode_cache",
 				sizeof(struct sfs_inode_info), 0,
 				(SLAB_RECLAIM_ACCOUNT|SLAB_MEM_SPREAD|SLAB_ACCOUNT),
@@ -98,6 +100,7 @@ static void destroy_inode_cache(void)
 	 * Make sure all delayed rcu free inodes are flushed before we
 	 * destroy cache.
 	 */
+	printk(KERN_ERR "jy: destroy_inode_cache\n");
 	rcu_barrier();
 	kmem_cache_destroy(sfs_inode_cachep);
 }
@@ -456,8 +459,9 @@ int sfs_prepare_chunk(struct page *page, loff_t pos, unsigned len)
 	return __block_write_begin(page, pos, len, sfs_get_block);
 }
 
-static void sfs_truncate_blocks(struct inode * inode) {
-
+static void sfs_truncate_blocks(struct inode * inode)
+{
+	printk(KERN_ERR "jy: truncate_blocks\n");
 }
 
 static void sfs_write_failed(struct address_space *mapping, loff_t to)
@@ -1237,14 +1241,62 @@ int sfs_write_inode(struct inode *inode, struct writeback_control *wbc)
 	return sfs_update_inode(inode, wbc->sync_mode == WB_SYNC_ALL);
 }
 
+void sfs_evict_inode(struct inode *inode)
+{
+	int want_delete = 0;
+
+	printk(KERN_ERR "jy: evict_inode\n");
+	if (!inode->i_nlink && !is_bad_inode(inode))
+		want_delete = 1;
+	
+	truncate_inode_pages_final(&inode->i_data);
+	printk(KERN_ERR "jy: evict_inode0\n");
+	if (want_delete) {
+		inode->i_size = 0;
+		if (inode->i_blocks &&
+			(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
+			S_ISLNK(inode->i_mode)))
+			sfs_truncate_blocks(inode);
+		sfs_update_inode(inode, inode_needs_sync(inode));
+	}
+
+	printk(KERN_ERR "jy: evict_inode1\n");
+	invalidate_inode_buffers(inode);
+	clear_inode(inode);
+
+	printk(KERN_ERR "jy: evict_inode2\n");
+	if (want_delete)
+		sfs_free_inode(inode);
+	printk(KERN_ERR "jy: evict_inode3\n");
+}
+
+static int sfs_sync_fs(struct super_block *sb, int wait)
+{
+	printk(KERN_ERR "jy: sync_fs\n");
+
+	return 0;
+}
+
+static void sfs_put_super(struct super_block *sb)
+{
+	struct sfs_sb_info *sbi = SFS_SB(sb);
+
+	printk(KERN_ERR "jy: put_super\n");
+	
+	kvfree(sbi->raw_super);
+	kvfree(sbi);
+
+	return;
+}
+
 static const struct super_operations sfs_sops = {
 	.alloc_inode    = sfs_alloc_inode,
 	.free_inode     = sfs_free_inode,
 	.write_inode    = sfs_write_inode,
-/*
 	.evict_inode    = sfs_evict_inode,
-	.put_super      = sfs_put_super,
 	.sync_fs        = sfs_sync_fs,
+	.put_super      = sfs_put_super,
+/*
 	.freeze_fs      = sfs_freeze,
 	.unfreeze_fs    = sfs_unfreeze,
 	.statfs         = sfs_statfs,
@@ -1295,6 +1347,10 @@ static int sfs_read_inode(struct inode *inode, struct sfs_inode *sfs_inode)
 	
 	printk(KERN_ERR "jy: read_inode\n");
 
+	if (inode->i_nlink == 0)
+		return -ESTALE;
+
+	printk(KERN_ERR "jy: read_inode0\n");
 	inode->i_mode = le16_to_cpu(sfs_inode->i_mode);
 	i_uid_write(inode, le32_to_cpu(sfs_inode->i_uid));
 	i_gid_write(inode, le32_to_cpu(sfs_inode->i_gid));
@@ -1371,6 +1427,8 @@ struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
 	inode_inc_iversion(inode);
 
 	sfs_set_inode_ops(inode);
+
+	unlock_new_inode(inode);
 
 	return inode;
 
@@ -1466,6 +1524,7 @@ static int __init init_sfs_fs(void)
 {
 	int err;
 
+	printk(KERN_ERR "jy: init_sfs_fs\n");
 	err = init_inode_cache();
 	if (err)
 		goto out1;
@@ -1476,14 +1535,17 @@ static int __init init_sfs_fs(void)
 	return 0;
 
 out2:
+	printk(KERN_ERR "jy: init_sfs_fs0\n");
 	destroy_inode_cache();
 
 out1:
+	printk(KERN_ERR "jy: init_sfs_fs1\n");
 	return err;
 }
 
 static void __exit exit_sfs_fs(void)
 {
+	printk(KERN_ERR "jy: exit_sfs_fs\n");
 	unregister_filesystem(&sfs_fs_type);
 	destroy_inode_cache();
 }
