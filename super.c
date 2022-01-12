@@ -34,8 +34,6 @@ static void sfs_put_super(struct super_block *sb)
 {
 	struct sfs_sb_info *sbi = SFS_SB(sb);
 
-	printk(KERN_ERR "jy: put_super\n");
-	
 	kvfree(sbi->raw_super);
 	kvfree(sbi);
 
@@ -114,7 +112,6 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto free_sbi;
 	}
 
-	printk(KERN_ERR "jy: fill_super0\n");
 	ret = sfs_read_raw_super(sbi, &raw_super, &valid_super_block);
 	if (ret) {
 		sfs_msg(KERN_ERR, "sfs_fill_super", "Failed to read superblock");
@@ -134,7 +131,6 @@ static int sfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	//flag operation
 
-	printk(KERN_ERR "jy: fill_super1\n");
 	root = sfs_iget(sb, SFS_ROOT_INO);
 	if (IS_ERR(root)) {
 		ret = PTR_ERR(root);
@@ -157,7 +153,6 @@ free_sbi:
 	return ret;
 
 failed_nomem:
-	printk(KERN_ERR "jy: fill_super4\n");
 	sfs_msg(KERN_ERR, "sfs_fill_super", "ENOMEM");
 	return -ENOMEM;
 }
@@ -167,7 +162,6 @@ static struct kmem_cache *sfs_inode_cachep;
 static struct inode *sfs_alloc_inode(struct super_block *sb)
 {
 	struct sfs_inode_info *si;
-	printk(KERN_ERR "jy: alloc inode\n");
 
 	si = kmem_cache_alloc(sfs_inode_cachep, GFP_KERNEL);
 	if (!si)
@@ -180,7 +174,6 @@ static struct inode *sfs_alloc_inode(struct super_block *sb)
 
 static void sfs_free_inode(struct inode *inode)
 {
-	printk(KERN_ERR "jy: free_inode %lu\n", inode->i_ino);
 	kmem_cache_free(sfs_inode_cachep, SFS_I(inode));
 }
 
@@ -188,13 +181,11 @@ static void init_once(void *foo)
 {
 	struct sfs_inode_info *si = (struct sfs_inode_info *) foo;
 
-	printk(KERN_ERR "jy: init_once\n");
 	inode_init_once(&si->vfs_inode);
 }
 
 static int __init init_inode_cache(void)
 {
-	printk(KERN_ERR "jy: init_inode_cache\n");
         sfs_inode_cachep = kmem_cache_create_usercopy("sfs_inode_cache",
 				sizeof(struct sfs_inode_info), 0,
 				(SLAB_RECLAIM_ACCOUNT|SLAB_MEM_SPREAD|SLAB_ACCOUNT),
@@ -212,7 +203,6 @@ static void destroy_inode_cache(void)
 	 * Make sure all delayed rcu free inodes are flushed before we
 	 * destroy cache.
 	 */
-	printk(KERN_ERR "jy: destroy_inode_cache\n");
 	rcu_barrier();
 	kmem_cache_destroy(sfs_inode_cachep);
 }
@@ -249,7 +239,6 @@ static int __init init_sfs_fs(void)
 {
 	int err;
 
-	printk(KERN_ERR "jy: init_sfs_fs\n");
 	err = init_inode_cache();
 	if (err)
 		goto out1;
@@ -260,17 +249,14 @@ static int __init init_sfs_fs(void)
 	return 0;
 
 out2:
-	printk(KERN_ERR "jy: init_sfs_fs0\n");
 	destroy_inode_cache();
 
 out1:
-	printk(KERN_ERR "jy: init_sfs_fs1\n");
 	return err;
 }
 
 static void __exit exit_sfs_fs(void)
 {
-	printk(KERN_ERR "jy: exit_sfs_fs\n");
 	unregister_filesystem(&sfs_fs_type);
 	destroy_inode_cache();
 }

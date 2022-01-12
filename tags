@@ -292,14 +292,14 @@ sfs_configuration	mkfs/sfs_fs.h	/^struct sfs_configuration {$/;"	s
 sfs_configuration	sfs_fs.h	/^struct sfs_configuration {$/;"	s
 sfs_create	namei.c	/^static int sfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, bool excl)$/;"	f	file:
 sfs_create_root_dir	mkfs/mkfs_format.c	/^static int sfs_create_root_dir(void)$/;"	f	file:
-sfs_delete_entry	dir.c	/^static int sfs_delete_entry(struct inode *inode, struct sfs_dir_entry *dir, struct page *page)$/;"	f	file:
+sfs_delete_entry	dir.c	/^int sfs_delete_entry(struct inode *inode, struct sfs_dir_entry *dir, struct page *page)$/;"	f
 sfs_dentry_block	mkfs/sfs_fs.h	/^struct sfs_dentry_block {$/;"	s
 sfs_dev_is_mounted	mkfs/mkfs_lib.c	/^int sfs_dev_is_mounted(void)$/;"	f
 sfs_dir_entry	mkfs/sfs_fs.h	/^struct sfs_dir_entry {$/;"	s
 sfs_dir_entry	sfs_fs.h	/^struct sfs_dir_entry {$/;"	s
 sfs_dir_inode_operations	namei.c	/^const struct inode_operations sfs_dir_inode_operations = {$/;"	v	typeref:struct:inode_operations
 sfs_dir_operations	dir.c	/^const struct file_operations sfs_dir_operations = {$/;"	v	typeref:struct:file_operations
-sfs_empty_dir	dir.c	/^static int sfs_empty_dir(struct inode *inode)$/;"	f	file:
+sfs_empty_dir	dir.c	/^int sfs_empty_dir(struct inode *inode)$/;"	f
 sfs_evict_inode	inode.c	/^void sfs_evict_inode(struct inode *inode)$/;"	f
 sfs_file_inode_operations	inode.c	/^const struct inode_operations sfs_file_inode_operations = {$/;"	v	typeref:struct:inode_operations
 sfs_file_operations	inode.c	/^const struct file_operations sfs_file_operations = {$/;"	v	typeref:struct:file_operations
@@ -316,7 +316,7 @@ sfs_fs_type	super.c	/^static struct file_system_type sfs_fs_type = {$/;"	v	typer
 sfs_get_block	inode.c	/^static int sfs_get_block(struct inode *inode, sector_t iblock,$/;"	f	file:
 sfs_get_device_info	mkfs/mkfs_lib.c	/^int sfs_get_device_info(void)$/;"	f
 sfs_get_page	dir.c	/^static struct page *sfs_get_page(struct inode *dir, unsigned long n)$/;"	f	file:
-sfs_iget	inode.c	/^static struct inode *sfs_iget(struct super_block *sb, unsigned long ino)$/;"	f	file:
+sfs_iget	inode.c	/^struct inode *sfs_iget(struct super_block *sb, unsigned long ino)$/;"	f
 sfs_init_configuration	mkfs/mkfs_main.c	/^void sfs_init_configuration(void)$/;"	f
 sfs_init_sb_info	super.c	/^static void sfs_init_sb_info(struct sfs_sb_info *sbi, struct sfs_super_block *raw_super)$/;"	f	file:
 sfs_inode	mkfs/sfs_fs.h	/^struct sfs_inode {$/;"	s
@@ -332,8 +332,8 @@ sfs_match	dir.c	/^static inline int sfs_match(int len, const unsigned char *name
 sfs_max_bit	sfs.h	35;"	d
 sfs_mkdir	namei.c	/^static int sfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)$/;"	f	file:
 sfs_mount	super.c	/^static struct dentry *sfs_mount(struct file_system_type *fs_type, int flags,$/;"	f	file:
-sfs_msg	sfs.h	/^void sfs_msg(const char *level, const char *funtion, const char *fmt, ...)$/;"	f
-sfs_new_inode	super.c	/^struct inode *sfs_new_inode(struct inode *dir, umode_t mode)$/;"	f
+sfs_msg	super.c	/^void sfs_msg(const char *level, const char *funtion, const char *fmt, ...)$/;"	f
+sfs_new_inode	inode.c	/^struct inode *sfs_new_inode(struct inode *dir, umode_t mode)$/;"	f
 sfs_next_entry	dir.c	/^static inline struct sfs_dir_entry *sfs_next_entry(struct sfs_dir_entry *p)$/;"	f	file:
 sfs_parse_options	mkfs/mkfs_main.c	/^static void sfs_parse_options(int argc, char *argv[])$/;"	f	file:
 sfs_prepare_chunk	inode.c	/^int sfs_prepare_chunk(struct page *page, loff_t pos, unsigned len)$/;"	f
@@ -348,7 +348,7 @@ sfs_rmdir	namei.c	/^static int sfs_rmdir(struct inode *dir, struct dentry *dentr
 sfs_sb_info	sfs.h	/^struct sfs_sb_info {$/;"	s
 sfs_set_bit	mkfs/mkfs_lib.c	/^int sfs_set_bit(unsigned int nr, char *addr)$/;"	f
 sfs_set_inode_ops	inode.c	/^static void sfs_set_inode_ops(struct inode *inode)$/;"	f	file:
-sfs_setattr	super.c	/^static int sfs_setattr(struct dentry *dentry, struct iattr *attr)$/;"	f	file:
+sfs_setattr	inode.c	/^int sfs_setattr(struct dentry *dentry, struct iattr *attr)$/;"	f
 sfs_show_info	mkfs/mkfs_main.c	/^static void sfs_show_info(void) {$/;"	f	file:
 sfs_sops	super.c	/^static const struct super_operations sfs_sops = {$/;"	v	typeref:struct:super_operations	file:
 sfs_sops	super.c	/^static const struct super_operations sfs_sops;$/;"	v	typeref:struct:super_operations	file:

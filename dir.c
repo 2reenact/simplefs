@@ -20,28 +20,21 @@ static int sfs_commit_chunk(struct page *page, loff_t pos, unsigned len)
 	struct inode *dir = mapping->host;
 	int err = 0;
 
-	printk(KERN_ERR "jy: commit_chunk %lu, 0x%llx\n", page->mapping->host->i_ino, pos);
 	inode_inc_iversion(dir);
 	block_write_end(NULL, mapping, pos, len, len, page, NULL);
-	printk(KERN_ERR "jy: commit_chunk0 %d, %lld\n", len, dir->i_size);
 
 	if (pos + len > dir->i_size) {
-		printk(KERN_ERR "jy: commit_chunk1\n");
 		i_size_write(dir, pos + len);
 		mark_inode_dirty(dir);
 	}
 
 	if (IS_DIRSYNC(dir)) {
-		printk(KERN_ERR "jy: commit_chunk2\n");
 		err = write_one_page(page);
 		if (!err)
 			err = sync_inode_metadata(dir, 1);
-		printk(KERN_ERR "jy: commit_chunk3\n");
 	} else {
-		printk(KERN_ERR "jy: commit_chunk4\n");
 		unlock_page(page);
 	}
-	printk(KERN_ERR "jy: commit_chunk5\n");
 
 	return err;
 }
@@ -58,14 +51,11 @@ ino_t sfs_inode_by_name(struct inode *dir, const struct qstr *qstr)
 	struct sfs_dir_entry *de;
 	struct page *page;
 
-	printk(KERN_ERR "jy: inode_by_name\n");
 	de = sfs_find_entry(dir, qstr, &page);
 	if (de) {
-		printk(KERN_ERR "jy: inode_by_name0\n");
 		ret = le32_to_cpu(de->inode);
 		sfs_put_page(page);
 	}
-	printk(KERN_ERR "jy: inode_by_name1\n");
 	return ret;
 }
 
@@ -73,21 +63,17 @@ static struct page *sfs_get_page(struct inode *dir, unsigned long n)
 {
 	struct address_space *mapping = dir->i_mapping;
 	struct page *page = read_mapping_page(mapping, n, NULL);
-	printk(KERN_ERR "jy: get_page %ld %ld\n", dir->i_ino, n);
 
 	if (!IS_ERR(page)) {
-		printk(KERN_ERR "jy: get_page0\n");
 		kmap(page);
 		if (unlikely(!PageChecked(page))) {
 			if (PageError(page))// || !sfs_check_page(page))
 				goto get_page_fail;
 		}
-		printk(KERN_ERR "jy: get_page1\n");
 	}
 	return page;
 
 get_page_fail:
-	printk(KERN_ERR "jy: get_page2\n");
 	sfs_put_page(page);
 	return ERR_PTR(-EIO);
 }
@@ -118,8 +104,6 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 	struct sfs_inode_info *si = SFS_I(dir);
 	struct sfs_dir_entry *de;
 
-	printk(KERN_ERR "jy: find_entry %ld, %s\n", dir->i_ino, name);
-
 	if (npages == 0 || namelen > SFS_MAXNAME_LEN)
 		goto out_find_entry;
 
@@ -143,7 +127,6 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 					sfs_put_page(page);
 					goto out_find_entry;
 				}
-				printk(KERN_ERR "jy: find_entry4: %d, %s\n", de->inode, de->name);
 				if (sfs_match(namelen, name, de))
 					goto entry_found;
 				de = sfs_next_entry(de);
@@ -153,13 +136,11 @@ struct sfs_dir_entry *sfs_find_entry(struct inode *dir, const struct qstr *qstr,
 		if (++n >= npages)
 			n = 0;
 	} while (n != start);
-	printk(KERN_ERR "jy: find_entry5\n");
 
 out_find_entry:
 	return NULL;
 
 entry_found:
-	printk(KERN_ERR "jy: find_entry6\n");
 	*res_page = page;
 	si->i_dir_start_lookup = n;
 	return de;
@@ -180,23 +161,19 @@ int sfs_add_link(struct dentry *dentry, struct inode *inode)
 	loff_t pos;
 	int err;
 
-	printk(KERN_ERR "jy: add_link %s, %ld\n", name, dir->i_ino);
 	for (n = 0; n <= npages; n++) {
 		char *dir_end;
 
-		printk(KERN_ERR "jy: add_link1\n");
 		page = sfs_get_page(dir, n);
 		err = PTR_ERR(page);
 		if (IS_ERR(page))
 			goto out_add_link;
 		lock_page(page);
-		printk(KERN_ERR "jy: add_link2\n");
 		kaddr = page_address(page);
 		dir_end = kaddr + sfs_last_byte(dir, n);
 		de = (struct sfs_dir_entry *)kaddr;
 		kaddr += PAGE_SIZE - reclen;
 		while ((char *)de <= kaddr) {
-			printk(KERN_ERR "jy: add_link3 %d %s\n", de->inode, de->name);
 			if ((char *)de == dir_end) {
 				name_len = 0;
 				rec_len = SFS_BLKSIZE;
@@ -210,14 +187,12 @@ int sfs_add_link(struct dentry *dentry, struct inode *inode)
 				goto out_unlock;
 			}	
 			err = -EEXIST;
-			printk(KERN_ERR "jy: add_link4\n");
 			if (sfs_match(namelen, name, de))
 				goto out_unlock;
 			name_len = SFS_DIR_REC_LEN(de->name_len);
 			rec_len = le16_to_cpu(de->rec_len);
 			if (!de->inode && rec_len >= reclen)
 				goto got_it;
-			printk(KERN_ERR "jy: add_link5\n");
 			if (rec_len >= name_len + reclen)
 				goto got_it;
 			de = (struct sfs_dir_entry *)((char *)de + rec_len);
@@ -225,16 +200,13 @@ int sfs_add_link(struct dentry *dentry, struct inode *inode)
 		unlock_page(page);
 		sfs_put_page(page);
 	}
-	printk(KERN_ERR "jy: add_link6\n");
 	return -EINVAL;
 
 got_it:
 	pos = page_offset(page) + (char *)de - (char *)page_address(page);
 	err = sfs_prepare_chunk(page, pos, rec_len);
-	printk(KERN_ERR "jy: add_link7 %lld\n", pos);
 	if (err)
 		goto out_unlock;
-	printk(KERN_ERR "jy: add_link8 %u\n", de->inode);
 	if (de->inode) {
 		struct sfs_dir_entry *del = (struct sfs_dir_entry *)((char *)de + name_len);
 		del->rec_len = cpu_to_le16(rec_len - name_len);
@@ -254,15 +226,12 @@ got_it:
 	mark_inode_dirty(dir);
 
 out_put:
-	printk(KERN_ERR "jy: add_link9\n");
 	sfs_put_page(page);
 
 out_add_link:
-	printk(KERN_ERR "jy: add_link10\n");
 	return err;
 
 out_unlock:
-	printk(KERN_ERR "jy: add_link11\n");
 	unlock_page(page);
 	goto out_put;
 }
@@ -285,9 +254,6 @@ static int sfs_readdir(struct file *file, struct dir_context *ctx)
 	unsigned long npages = dir_pages(inode);
 	bool need_revalidate = !inode_eq_iversion(inode, file->f_version);
 
-	printk(KERN_ERR "jy: readdir:%s %ld %ld %lld\n",
-			file->f_path.dentry->d_name.name, file->f_inode->i_ino, npages, pos);
-
 	if (pos > inode->i_size - SFS_DIR_REC_LEN(1))
 		return 0;
 
@@ -302,11 +268,9 @@ static int sfs_readdir(struct file *file, struct dir_context *ctx)
 			ctx->pos += PAGE_SIZE - offset;
 			return -EIO;
 		}
-		printk(KERN_ERR "jy: readdir1\n");
 		kaddr = page_address(page);
 		if (need_revalidate) {
 			if (offset) {
-				printk(KERN_ERR "jy: readdir1.5\n");
 				offset = sfs_validate_entry(kaddr, offset, ~(SFS_BLKSIZE - 1));
 				ctx->pos = (n << PAGE_SHIFT) + offset;
 			}
@@ -321,7 +285,6 @@ static int sfs_readdir(struct file *file, struct dir_context *ctx)
 				sfs_put_page(page);
 				return -EIO;
 			}
-			printk(KERN_ERR "jy: readdir2: %d %s\n", de->inode, de->name);
 			if (de->inode) {
 				unsigned char d_type = DT_UNKNOWN;
 
@@ -350,7 +313,6 @@ int sfs_delete_entry(struct inode *inode, struct sfs_dir_entry *dir, struct page
 	struct sfs_dir_entry *de = (struct sfs_dir_entry *)(kaddr + from);
 	int err;
 
-	printk(KERN_ERR "jy: delete_entry %ld %d %d %d\n", page->mapping->host->i_ino, dir->inode, from, to);
 
 	while ((char *)de < (char *)dir) {
 		if (de->rec_len == 0) {
@@ -358,18 +320,15 @@ int sfs_delete_entry(struct inode *inode, struct sfs_dir_entry *dir, struct page
 			err = -EIO;
 			goto out_delete_entry;
 		}
-		printk(KERN_ERR "jy: delete_entry0\n");
 		pde = de;
 		de = sfs_next_entry(de);
 	}
 	if (pde)
 		from = (char *)pde - (char *)page_address(page);
-	printk(KERN_ERR "jy: delete_entry0.5 %d\n", from);
 	
 	pos = page_offset(page) + from;
 	lock_page(page);
 	err = sfs_prepare_chunk(page, pos, to - from);
-	printk(KERN_ERR "jy: delete_entry1 %lld\n", pos);
 	if (pde)
 		pde->rec_len = cpu_to_le16(to - from);
 	dir->inode = 0;
@@ -377,7 +336,6 @@ int sfs_delete_entry(struct inode *inode, struct sfs_dir_entry *dir, struct page
 	inode->i_ctime = inode->i_mtime = current_time(inode);
 	mark_inode_dirty(inode);
 out_delete_entry:
-	printk(KERN_ERR "jy: delete_entry2\n");
 	sfs_put_page(page);
 	return err;
 }
@@ -390,18 +348,15 @@ int sfs_make_empty(struct inode *inode, struct inode *dir)
 	void *kaddr;
 	int err;
 
-	printk(KERN_ERR "jy: make_empty\n");
 	if (!page)
 		return -ENOMEM;
 
-	printk(KERN_ERR "jy: make_empty0 %lu, %lu\n", inode->i_ino, dir->i_ino);
 	err = sfs_prepare_chunk(page, 0, SFS_BLKSIZE);
 	if (err) {
 		unlock_page(page);
 		goto fail;
 	}
 
-	printk(KERN_ERR "jy: make_empty1\n");
 	kaddr = kmap_atomic(page);
 	memset(kaddr, 0, PAGE_SIZE);
 
@@ -419,11 +374,9 @@ int sfs_make_empty(struct inode *inode, struct inode *dir)
 	de->inode = cpu_to_le32(dir->i_ino);
 	de->file_type = fs_umode_to_ftype(inode->i_mode);
 
-	printk(KERN_ERR "jy: make_empty2\n");
 	kunmap_atomic(kaddr);
 	err = sfs_commit_chunk(page, 0, SFS_BLKSIZE);
 fail:
-	printk(KERN_ERR "jy: make_empty3\n");
 	put_page(page);
 	return err;
 }
@@ -435,7 +388,6 @@ int sfs_empty_dir(struct inode *inode)
 	struct sfs_dir_entry *de;
 	char *kaddr;
 
-	printk(KERN_ERR "jy: empty_dir\n");
 	for (i = 0; i < npages; i++) {
 		page = sfs_get_page(inode, i);
 
