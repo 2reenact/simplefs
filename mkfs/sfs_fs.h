@@ -163,7 +163,7 @@ static inline u_int64_t bswap_64(u_int64_t val)
 #endif
 #define PAGE_CACHE_SIZE		4096
 #define BITS_PER_BYTE		8
-#define SFS_SUPER_MAGIC		0x202112F5	/* SFS Magic Number */
+#define SFS_SUPER_MAGIC		0x202105F5	/* SFS Magic Number */
 #define MAX_PATH_LEN		24
 
 #define SFS_BYTES_TO_BLK(bytes)    ((bytes) >> SFS_BLKSIZE_BITS)

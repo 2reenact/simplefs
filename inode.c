@@ -1,15 +1,23 @@
+/*
+ * inode.c
+ *
+ * 2021 Lee JeYeon., Dankook Univ.
+ *		2reenact@gmail.com
+ *
+ */
+
 #include <linux/buffer_head.h>
 #include <linux/writeback.h>
 #include <linux/iversion.h>
 
-#include "sfs_fs.h"
-#include "sfs.h"
+#include "vsfs_fs.h"
+#include "vsfs.h"
 
-static int sfs_block_to_path(sector_t iblock, unsigned int offsets[4])
+static int vsfs_block_to_path(sector_t iblock, unsigned int offsets[4])
 {
-	int ptrs = SFS_NODE_PER_BLK;
-	int ptrs_bits = SFS_NODE_PER_BLK_BIT;
-	const long direct_blocks = SFS_DIR_BLK_CNT,
+	int ptrs = VSFS_NODE_PER_BLK;
+	int ptrs_bits = VSFS_NODE_PER_BLK_BIT;
+	const long direct_blocks = VSFS_DIR_BLK_CNT,
 		indirect_blocks = ptrs,
 		double_blocks = (1 << (ptrs_bits * 2));
 	int n = 0;
@@ -17,19 +25,19 @@ static int sfs_block_to_path(sector_t iblock, unsigned int offsets[4])
 	if (iblock < direct_blocks) {
 		offsets[n++] = iblock;
 	} else if ((iblock -= direct_blocks) < indirect_blocks) {
-		offsets[n++] = SFS_IND_BLK;
+		offsets[n++] = VSFS_IND_BLK;
 		offsets[n++] = iblock;
 	} else if ((iblock -= indirect_blocks) < double_blocks) {
-		offsets[n++] = SFS_DIND_BLK;
+		offsets[n++] = VSFS_DIND_BLK;
 		offsets[n++] = iblock >> ptrs_bits;
 		offsets[n++] = iblock & (ptrs - 1);
 	} else if (((iblock -= double_blocks) >> (ptrs_bits * 2)) < ptrs) {
-		offsets[n++] = SFS_TIND_BLK;
+		offsets[n++] = VSFS_TIND_BLK;
 		offsets[n++] = iblock >> (ptrs_bits * 2);
 		offsets[n++] = (iblock >> ptrs_bits) & (ptrs - 1);
 		offsets[n++] = iblock & (ptrs - 1);
 	} else {
-		sfs_msg(KERN_ERR, "sfs_block_to_path", "block > big");
+		vsfs_msg(KERN_ERR, "vsfs_block_to_path", "block > big");
 	}
 	return n;
 
@@ -54,16 +62,16 @@ static inline int verify_chain(Indirect *from, Indirect *to)
 	return (from > to);
 }
 
-static Indirect *sfs_find_branch(struct inode *inode, Indirect *chain, unsigned int *offsets, int depth, int *err)
+static Indirect *vsfs_find_branch(struct inode *inode, Indirect *chain, unsigned int *offsets, int depth, int *err)
 {
 	struct super_block *sb = inode->i_sb;
-	struct sfs_inode_info *si = SFS_I(inode);
+	struct vsfs_inode_info *vsi = VSFS_I(inode);
 	Indirect *p = chain;
 	struct buffer_head *bh;
 
 	*err = 0;
 
-	add_chain(chain, NULL, si->i_data + *offsets);
+	add_chain(chain, NULL, vsi->i_data + *offsets);
 	if (!p->key)
 		goto no_block;
 	while (--depth) {
@@ -90,10 +98,10 @@ no_block:
 	return p;
 }
 
-static int sfs_alloc_blocks(struct inode *inode, unsigned int *new_blocks, int indirect_blks, int blks, int *err)
+static int vsfs_alloc_blocks(struct inode *inode, unsigned int *new_blocks, int indirect_blks, int blks, int *err)
 {
 	struct super_block *sb = inode->i_sb;
-	struct sfs_sb_info *sbi = SFS_SB(sb);
+	struct vsfs_sb_info *sbi = VSFS_SB(sb);
 	struct buffer_head *bitmap_bh = NULL;
 	unsigned i, target;
 	int bno, ret = 0;
@@ -101,9 +109,9 @@ static int sfs_alloc_blocks(struct inode *inode, unsigned int *new_blocks, int i
 	*err = 0;
 	target = blks + indirect_blks;
 
-	for (i = 0; i < SFS_GET_SB(blkcnt_dmap); i++) {
+	for (i = 0; i < VSFS_GET_SB(blkcnt_dmap); i++) {
 		brelse(bitmap_bh);
-		bitmap_bh = sb_bread(sb, SFS_GET_SB(dmap_blkaddr) + i);
+		bitmap_bh = sb_bread(sb, VSFS_GET_SB(dmap_blkaddr) + i);
 		if (!bitmap_bh) {
 			*err = -EIO;
 			goto failed_alloc_blocks;
@@ -111,11 +119,11 @@ static int sfs_alloc_blocks(struct inode *inode, unsigned int *new_blocks, int i
 find_next:
 		bno = 0;
 
-		bno = find_next_zero_bit_le(bitmap_bh->b_data, SFS_BLKSIZE, 0);
-		if (bno >= sfs_max_bit(i + 1))
+		bno = find_next_zero_bit_le(bitmap_bh->b_data, VSFS_BLKSIZE, 0);
+		if (bno >= vsfs_max_bit(i + 1))
 			continue;
 		if (!test_and_set_bit_le(bno, bitmap_bh->b_data)) {
-			*new_blocks++ = SFS_GET_SB(data_blkaddr) + sfs_max_bit(i) + bno;
+			*new_blocks++ = VSFS_GET_SB(data_blkaddr) + vsfs_max_bit(i) + bno;
 			ret++;
 			goto got_alloc_blocks;
 		}
@@ -132,32 +140,32 @@ got_alloc_blocks:
 		goto find_next;
 	brelse(bitmap_bh);
 
-#if 0
-	if (*(new_block - 1) > sfs_get(total_blkcnt)) {
+	if (*(new_blocks - 1) > VSFS_GET_SB(total_blkcnt)) {
 		brelse(bitmap_bh);
-		err = -EIO;
-		goto failed_alloc_branch;
+		*err = -EIO;
+		goto failed_alloc_blocks;
 	}
-#endif
+
 	return ret;
 
 failed_alloc_blocks:
 	return ret;
 }
 
-void sfs_free_blocks(struct inode *inode, unsigned int block, unsigned int count)
+void vsfs_free_blocks(struct inode *inode, unsigned int block, unsigned int count)
 {
 #if 0
 	struct buffer_head *bitmap_bh = NULL;
 	struct buffer_head *bh;
 	unsigned int bit, i;
 	struct super_block *sb = inode->i_sb;
-	struct sfs_sb_info *sbi = SFS_SB(sb);
+	struct vsfs_sb_info *sbi = VSFS_SB(sb);
 #endif
 
+//	Not implemented yet.. I'll do it later..
 }
 
-static int sfs_alloc_branch(struct inode *inode, Indirect *branch, int indirect_blks, unsigned int *offsets, int *count)
+static int vsfs_alloc_branch(struct inode *inode, Indirect *branch, int indirect_blks, unsigned int *offsets, int *count)
 {
 	struct super_block *sb = inode->i_sb;
 	struct buffer_head *bh;
@@ -165,7 +173,7 @@ static int sfs_alloc_branch(struct inode *inode, Indirect *branch, int indirect_
 	unsigned i, n, num;
 	int err;
 
-	num = sfs_alloc_blocks(inode, new_blocks, indirect_blks, *count, &err);
+	num = vsfs_alloc_blocks(inode, new_blocks, indirect_blks, *count, &err);
 	if (err)
 		return err;
 
@@ -179,7 +187,7 @@ static int sfs_alloc_branch(struct inode *inode, Indirect *branch, int indirect_
 		}
 		branch[n].bh = bh;
 		lock_buffer(bh);
-		memset(bh->b_data, 0, SFS_BLKSIZE);
+		memset(bh->b_data, 0, VSFS_BLKSIZE);
 		branch[n].p = (__le32 *)bh->b_data + offsets[n];
 		branch[n].key = cpu_to_le32(new_blocks[n]);
 		*branch[n].p = branch[n].key;
@@ -196,29 +204,25 @@ failed_alloc_branch:
 	for (i = 1; i < n; i++)
 		bforget(branch[i].bh);
 	for (i = 0; i < indirect_blks; i++)
-		sfs_free_blocks(inode, new_blocks[i], 1);
-	sfs_free_blocks(inode, new_blocks[i], 1);
+		vsfs_free_blocks(inode, new_blocks[i], 1);
+	vsfs_free_blocks(inode, new_blocks[i], 1);
 
 	return err;
 }
 
-static void sfs_splice_branch(struct inode *inode, long block, Indirect *where, int num, int blks)
+static void vsfs_splice_branch(struct inode *inode, long block, Indirect *where, int num, int blks)
 {
-#if 0
 	int i;
 	unsigned int current_block;
-#endif
 
 	*where->p = where->key;
 
-#if 0
 	if (num == 0 && blks > 1) {
 		current_block = le32_to_cpu(where->key) + 1;
 		for (i = 1; i < blks; i++) {
 			*(where->p + i) = cpu_to_le32(current_block++);
 		}
 	}
-#endif
 
 	if (where->bh)
 		mark_buffer_dirty_inode(where->bh, inode);
@@ -227,20 +231,20 @@ static void sfs_splice_branch(struct inode *inode, long block, Indirect *where, 
 	mark_inode_dirty(inode);
 }
 
-static int sfs_get_block(struct inode *inode, sector_t iblock,
+static int vsfs_get_block(struct inode *inode, sector_t iblock,
 		struct buffer_head *bh_result, int create)
 {
 	struct super_block *sb = inode->i_sb;
 	unsigned int offsets[4];
 	unsigned int bno, indirect_blks;
-	int depth = sfs_block_to_path(iblock, offsets);
+	int depth = vsfs_block_to_path(iblock, offsets);
 	Indirect chain[4], *partial;
 	int err, count = 1;
 	
 	if (depth == 0)
 		return -EIO;
 
-	partial = sfs_find_branch(inode, chain, offsets, depth, &err);
+	partial = vsfs_find_branch(inode, chain, offsets, depth, &err);
 	if (!partial)
 		goto done_get_block;
 
@@ -249,12 +253,12 @@ static int sfs_get_block(struct inode *inode, sector_t iblock,
 
 	indirect_blks = (chain + depth) - partial - 1;
 
-	err = sfs_alloc_branch(inode, partial, indirect_blks, offsets, &count);
+	err = vsfs_alloc_branch(inode, partial, indirect_blks, offsets, &count);
 	if (err)
-		sfs_msg(KERN_ERR, "sfs_get_block", "failed to alloc_brach");
+		vsfs_msg(KERN_ERR, "vsfs_get_block", "failed to alloc_brach");
 
 
-	sfs_splice_branch(inode, iblock, partial, indirect_blks, count);
+	vsfs_splice_branch(inode, iblock, partial, indirect_blks, count);
 		
 	partial = chain + depth - 1;
 
@@ -272,22 +276,22 @@ done_get_block:
 	return err;
 }
 
-static int sfs_writepage(struct page *page, struct writeback_control *wbc)
+static int vsfs_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page, sfs_get_block, wbc);
+	return block_write_full_page(page, vsfs_get_block, wbc);
 }
 
-static int sfs_readpage(struct file *file, struct page *page)
+static int vsfs_readpage(struct file *file, struct page *page)
 {
-	return block_read_full_page(page, sfs_get_block);
+	return block_read_full_page(page, vsfs_get_block);
 }
 
-int sfs_prepare_chunk(struct page *page, loff_t pos, unsigned len)
+int vsfs_prepare_chunk(struct page *page, loff_t pos, unsigned len)
 {
-	return __block_write_begin(page, pos, len, sfs_get_block);
+	return __block_write_begin(page, pos, len, vsfs_get_block);
 }
 
-static inline void sfs_free_data(struct inode *inode, __le32 *p, __le32 *q)
+static inline void vsfs_free_data(struct inode *inode, __le32 *p, __le32 *q)
 {
 	unsigned long block_to_free = 0, count = 0;
 	unsigned long nr;
@@ -301,7 +305,7 @@ static inline void sfs_free_data(struct inode *inode, __le32 *p, __le32 *q)
 			else if (block_to_free == nr - count)
 				count++;
 			else {
-				sfs_free_blocks(inode, block_to_free, count);
+				vsfs_free_blocks(inode, block_to_free, count);
 				mark_inode_dirty(inode);
 			free_this:
 				block_to_free = nr;
@@ -311,21 +315,21 @@ static inline void sfs_free_data(struct inode *inode, __le32 *p, __le32 *q)
 	}
 
 	if (count > 0) {
-		sfs_free_blocks(inode, block_to_free, count);
+		vsfs_free_blocks(inode, block_to_free, count);
 		mark_inode_dirty(inode);
 	}
 }
 
-static void sfs_free_full_branch(struct inode *inode, unsigned long ind_block, int depth)
+static void vsfs_free_full_branch(struct inode *inode, unsigned long ind_block, int depth)
 {
 	return;
 }	
 
-static void sfs_truncate_blocks(struct inode * inode)
+static void vsfs_truncate_blocks(struct inode * inode)
 {
-	struct sfs_inode_info *si = SFS_I(inode);
+	struct vsfs_inode_info *vsi = VSFS_I(inode);
 	unsigned int offsets[4];
-//	__le32 *i_data = SFS_I(inode)->i_data;
+//	__le32 *i_data = VSFS_I(inode)->i_data;
 	int depth, depth2;
 	unsigned long block;
 	unsigned i;
@@ -333,8 +337,8 @@ static void sfs_truncate_blocks(struct inode * inode)
 	sector_t last = 0;
 
 	if (inode->i_size) {
-		last = (inode->i_size - 1) >> SFS_BLKSHIFT;
-		depth = sfs_block_to_path(last, offsets);
+		last = (inode->i_size - 1) >> VSFS_BLKSHIFT;
+		depth = vsfs_block_to_path(last, offsets);
 		if (!depth)
 			return;
 	} else {
@@ -342,14 +346,14 @@ static void sfs_truncate_blocks(struct inode * inode)
 	}
 
 	for (depth2 = depth - 1; depth2; depth2--)
-		if (offsets[depth2] != SFS_NODE_PER_BLK - 1)
+		if (offsets[depth2] != VSFS_NODE_PER_BLK - 1)
 			break;
 	
 	if (depth == 1) {
-		//sfs_trunc_direct(inode);
-		offsets[0] = SFS_IND_BLK;
+		//vsfs_trunc_direct(inode);
+		offsets[0] = VSFS_IND_BLK;
 	} else {
-		p = &si->i_data[offsets[0]++];
+		p = &vsi->i_data[offsets[0]++];
 		for (i = 0; i < depth2; i++) {
 			block = le32_to_cpu(*(__le32 *)p);
 			if (!block)
@@ -357,42 +361,42 @@ static void sfs_truncate_blocks(struct inode * inode)
 		
 		}
 	}
-	for (i = offsets[0]; i <= SFS_TIND_BLK; i++) {
-		p = &si->i_data[i];
+	for (i = offsets[0]; i <= VSFS_TIND_BLK; i++) {
+		p = &vsi->i_data[i];
 		block = le32_to_cpu(*(__le32 *)p);
 		if (block) {
 			*(__le32 *)p = 0;
-			sfs_free_full_branch(inode, block, i - SFS_IND_BLK + 1);
+			vsfs_free_full_branch(inode, block, i - VSFS_IND_BLK + 1);
 		}
 	}
 	mark_inode_dirty(inode);
 }
 
-static void sfs_write_failed(struct address_space *mapping, loff_t to)
+static void vsfs_write_failed(struct address_space *mapping, loff_t to)
 {
 	struct inode *inode = mapping->host;
 
 	if (to > inode->i_size) {
 		truncate_pagecache(inode, inode->i_size);
-		sfs_truncate_blocks(inode);
+		vsfs_truncate_blocks(inode);
 	}
 }
 
-static int sfs_write_begin(struct file *file, struct address_space *mapping,
+static int vsfs_write_begin(struct file *file, struct address_space *mapping,
 		loff_t pos, unsigned len, unsigned flags,
 		struct page **pagep, void **fsdata)
 {
 	int ret;
 
 	ret = block_write_begin(mapping, pos, len, flags, pagep,
-			sfs_get_block);
+			vsfs_get_block);
 	if (unlikely(ret))
-		sfs_write_failed(mapping, pos + len);
+		vsfs_write_failed(mapping, pos + len);
 
 	return ret;
 }
 
-static int sfs_write_end(struct file *file, struct address_space *mapping,
+static int vsfs_write_end(struct file *file, struct address_space *mapping,
 		loff_t pos, unsigned len, unsigned copied,
 		struct page *page, void *fsdata)
 {
@@ -400,63 +404,63 @@ static int sfs_write_end(struct file *file, struct address_space *mapping,
 
 	ret = generic_write_end(file, mapping, pos, len, copied, page, fsdata);
 	if (ret < len)
-		sfs_write_failed(mapping, pos + len);
+		vsfs_write_failed(mapping, pos + len);
 	return ret;
 }
 
-static sector_t sfs_bmap(struct address_space *mapping, sector_t block)
+static sector_t vsfs_bmap(struct address_space *mapping, sector_t block)
 {
-	return generic_block_bmap(mapping, block, sfs_get_block);
+	return generic_block_bmap(mapping, block, vsfs_get_block);
 }
 
-const struct address_space_operations sfs_aops = {
-	.readpage	= sfs_readpage,
-	.writepage	= sfs_writepage,
-	.write_begin	= sfs_write_begin,
-	.write_end	= sfs_write_end,
-	.bmap		= sfs_bmap,
+const struct address_space_operations vsfs_aops = {
+	.readpage	= vsfs_readpage,
+	.writepage	= vsfs_writepage,
+	.write_begin	= vsfs_write_begin,
+	.write_end	= vsfs_write_end,
+	.bmap		= vsfs_bmap,
 };
 
-static int sfs_read_inode(struct inode *inode, struct sfs_inode *sfs_inode)
+static int vsfs_read_inode(struct inode *inode, struct vsfs_inode *vsfs_inode)
 {       
-	struct sfs_inode_info *si = SFS_I(inode);
+	struct vsfs_inode_info *vsi = VSFS_I(inode);
 	
 
 	if (inode->i_nlink == 0)
 		return -ESTALE;
 
-	inode->i_mode = le16_to_cpu(sfs_inode->i_mode);
-	i_uid_write(inode, le32_to_cpu(sfs_inode->i_uid));
-	i_gid_write(inode, le32_to_cpu(sfs_inode->i_gid));
-	set_nlink(inode, le16_to_cpu(sfs_inode->i_links));
-	inode->i_size = le32_to_cpu(sfs_inode->i_size);
-	inode->i_atime.tv_sec = (signed)le32_to_cpu(sfs_inode->i_atime);
-	inode->i_ctime.tv_sec = (signed)le32_to_cpu(sfs_inode->i_ctime);
-	inode->i_mtime.tv_sec = (signed)le32_to_cpu(sfs_inode->i_mtime);
+	inode->i_mode = le16_to_cpu(vsfs_inode->i_mode);
+	i_uid_write(inode, le32_to_cpu(vsfs_inode->i_uid));
+	i_gid_write(inode, le32_to_cpu(vsfs_inode->i_gid));
+	set_nlink(inode, le16_to_cpu(vsfs_inode->i_links));
+	inode->i_size = le32_to_cpu(vsfs_inode->i_size);
+	inode->i_atime.tv_sec = (signed)le32_to_cpu(vsfs_inode->i_atime);
+	inode->i_ctime.tv_sec = (signed)le32_to_cpu(vsfs_inode->i_ctime);
+	inode->i_mtime.tv_sec = (signed)le32_to_cpu(vsfs_inode->i_mtime);
 	inode->i_atime.tv_nsec = inode->i_mtime.tv_nsec = inode->i_ctime.tv_nsec = 0;
-	inode->i_blocks = le32_to_cpu(sfs_inode->i_blocks);
+	inode->i_blocks = le32_to_cpu(vsfs_inode->i_blocks);
 
-	memcpy(si->i_data, sfs_inode->i_daddr, sizeof(si->i_data));
+	memcpy(vsi->i_data, vsfs_inode->i_daddr, sizeof(vsi->i_data));
 
 	return 0;
 }
 
-static void sfs_set_inode_ops(struct inode *inode)
+static void vsfs_set_inode_ops(struct inode *inode)
 {
 	if (S_ISREG(inode->i_mode)) {
-		inode->i_op = &sfs_file_inode_operations;
-		inode->i_fop = &sfs_file_operations;
-		inode->i_mapping->a_ops = &sfs_aops;
+		inode->i_op = &vsfs_file_inode_operations;
+		inode->i_fop = &vsfs_file_operations;
+		inode->i_mapping->a_ops = &vsfs_aops;
 	} else if (S_ISDIR(inode->i_mode)) {
-		inode->i_op = &sfs_dir_inode_operations;
-		inode->i_fop = &sfs_dir_operations;
-		inode->i_mapping->a_ops = &sfs_aops;
+		inode->i_op = &vsfs_dir_inode_operations;
+		inode->i_fop = &vsfs_dir_operations;
+		inode->i_mapping->a_ops = &vsfs_aops;
 	} 
 }
 
-struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
+struct inode *vsfs_iget(struct super_block *sb, unsigned long ino)
 {
-	struct sfs_inode *sfs_inode;
+	struct vsfs_inode *vsfs_inode;
 	struct buffer_head *bh;
 	struct inode *inode;
 	int err = -EIO;
@@ -469,20 +473,20 @@ struct inode *sfs_iget(struct super_block *sb, unsigned long ino)
 
 	inode->i_sb = sb;
 
-	bh = sb_bread(sb, sfs_inotoba(ino));
+	bh = sb_bread(sb, vsfs_inotoba(ino));
 	if (!bh) {
-		sfs_msg(KERN_ERR, "sfs_iget", "Failed to read inode %d\n", ino);
+		vsfs_msg(KERN_ERR, "vsfs_iget", "Failed to read inode %d\n", ino);
 		goto bad_inode;
 	}
-	sfs_inode = (struct sfs_inode *)bh->b_data;
-	err = sfs_read_inode(inode, sfs_inode);
+	vsfs_inode = (struct vsfs_inode *)bh->b_data;
+	err = vsfs_read_inode(inode, vsfs_inode);
 	brelse(bh);
 	if (err)
 		goto bad_inode;
 
 	inode_inc_iversion(inode);
 
-	sfs_set_inode_ops(inode);
+	vsfs_set_inode_ops(inode);
 
 	unlock_new_inode(inode);
 
@@ -493,43 +497,43 @@ bad_inode:
 	return ERR_PTR(err);
 }
 
-static void sfs_fill_inode(struct inode *inode, struct sfs_inode *sfs_inode)
+static void vsfs_fill_inode(struct inode *inode, struct vsfs_inode *vsfs_inode)
 {
-	struct sfs_inode_info *si = SFS_I(inode);
+	struct vsfs_inode_info *vsi = VSFS_I(inode);
 
-	sfs_inode->i_mode = cpu_to_le16(inode->i_mode);
-	sfs_inode->i_links = cpu_to_le16(inode->i_nlink);
+	vsfs_inode->i_mode = cpu_to_le16(inode->i_mode);
+	vsfs_inode->i_links = cpu_to_le16(inode->i_nlink);
 
-	sfs_inode->i_uid = cpu_to_le32(i_uid_read(inode));
-	sfs_inode->i_gid = cpu_to_le32(i_gid_read(inode));
+	vsfs_inode->i_uid = cpu_to_le32(i_uid_read(inode));
+	vsfs_inode->i_gid = cpu_to_le32(i_gid_read(inode));
 
-	sfs_inode->i_size = cpu_to_le64(inode->i_size);
-	sfs_inode->i_atime_nsec = cpu_to_le32(inode->i_atime.tv_sec);
-	sfs_inode->i_ctime_nsec = cpu_to_le32(inode->i_ctime.tv_sec);
-	sfs_inode->i_mtime_nsec = cpu_to_le32(inode->i_mtime.tv_sec);
-	sfs_inode->i_blocks = cpu_to_le32(inode->i_blocks);
-	sfs_inode->i_flags = cpu_to_le32(si->i_flags);
+	vsfs_inode->i_size = cpu_to_le64(inode->i_size);
+	vsfs_inode->i_atime_nsec = cpu_to_le32(inode->i_atime.tv_sec);
+	vsfs_inode->i_ctime_nsec = cpu_to_le32(inode->i_ctime.tv_sec);
+	vsfs_inode->i_mtime_nsec = cpu_to_le32(inode->i_mtime.tv_sec);
+	vsfs_inode->i_blocks = cpu_to_le32(inode->i_blocks);
+	vsfs_inode->i_flags = cpu_to_le32(vsi->i_flags);
 
-	memcpy(&sfs_inode->i_daddr, si->i_data, sizeof(si->i_data));
+	memcpy(&vsfs_inode->i_daddr, vsi->i_data, sizeof(vsi->i_data));
 	
 	if (!inode->i_nlink)
-		memset(sfs_inode, 0, sizeof(struct sfs_inode));
+		memset(vsfs_inode, 0, sizeof(struct vsfs_inode));
 }
 
-static int sfs_update_inode(struct inode *inode, int do_sync) {
+static int vsfs_update_inode(struct inode *inode, int do_sync) {
 	struct super_block *sb = inode->i_sb;
-	struct sfs_inode *sfs_inode;
+	struct vsfs_inode *vsfs_inode;
 	struct buffer_head *bh;
 
-	bh = sb_bread(sb, sfs_inotoba(inode->i_ino));
+	bh = sb_bread(sb, vsfs_inotoba(inode->i_ino));
 	if (!bh) {
-		sfs_msg(KERN_ERR, "sfs_update_inode", "Failed to read inode %lu\n", inode->i_ino);
+		vsfs_msg(KERN_ERR, "vsfs_update_inode", "Failed to read inode %lu\n", inode->i_ino);
 		return -1;
 	}
 
-	sfs_inode = (struct sfs_inode *)bh->b_data;
+	vsfs_inode = (struct vsfs_inode *)bh->b_data;
 
-	sfs_fill_inode(inode, sfs_inode);
+	vsfs_fill_inode(inode, vsfs_inode);
 
 	mark_buffer_dirty(bh);
 	if (do_sync)
@@ -539,12 +543,12 @@ static int sfs_update_inode(struct inode *inode, int do_sync) {
 	return 0;
 }
 
-int sfs_write_inode(struct inode *inode, struct writeback_control *wbc)
+int vsfs_write_inode(struct inode *inode, struct writeback_control *wbc)
 {
-	return sfs_update_inode(inode, wbc->sync_mode == WB_SYNC_ALL);
+	return vsfs_update_inode(inode, wbc->sync_mode == WB_SYNC_ALL);
 }
 
-void sfs_evict_inode(struct inode *inode)
+void vsfs_evict_inode(struct inode *inode)
 {
 	int want_delete = 0;
 
@@ -556,30 +560,26 @@ void sfs_evict_inode(struct inode *inode)
 	if (want_delete) {
 		inode->i_size = 0;
 		if (inode->i_blocks)
-			sfs_truncate_blocks(inode);
-		sfs_update_inode(inode, inode_needs_sync(inode));
+			vsfs_truncate_blocks(inode);
+		vsfs_update_inode(inode, inode_needs_sync(inode));
 	}
 
 	invalidate_inode_buffers(inode);
 	clear_inode(inode);
 
-#if 0
-	if (want_delete)
-		sfs_free_inode(inode);
-#endif
 }
 
-struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
+struct inode *vsfs_new_inode(struct inode *dir, umode_t mode)
 {
 	struct super_block *sb;
-	struct sfs_sb_info *sbi;
+	struct vsfs_sb_info *sbi;
 	struct buffer_head *bitmap_bh = NULL;
 	struct buffer_head *bh;
 	unsigned i;
 	ino_t ino = 0;
 	struct inode *inode;
-	struct sfs_inode_info *si;
-	struct sfs_inode *sfs_inode;
+	struct vsfs_inode_info *vsi;
+	struct vsfs_inode *vsfs_inode;
 	struct timespec64 ts;
 	int err = -ENOSPC;
 
@@ -592,23 +592,23 @@ struct inode *sfs_new_inode(struct inode *dir, umode_t mode)
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
 
-	si = SFS_I(inode);
-	sbi = SFS_SB(sb);
+	vsi = VSFS_I(inode);
+	sbi = VSFS_SB(sb);
 
-	for (i = 0; i < SFS_GET_SB(blkcnt_imap); i++) {
+	for (i = 0; i < VSFS_GET_SB(blkcnt_imap); i++) {
 		brelse(bitmap_bh);
-		bitmap_bh = sb_bread(sb, SFS_GET_SB(imap_blkaddr) + i);
+		bitmap_bh = sb_bread(sb, VSFS_GET_SB(imap_blkaddr) + i);
 		if (!bitmap_bh) {
 			err = -EIO;
 			goto failed;
 		}
 		ino = 0;
 
-		ino = find_next_zero_bit_le(bitmap_bh->b_data, SFS_BLKSIZE, 0);
-		if (ino >= sfs_max_bit(i + 1))
+		ino = find_next_zero_bit_le(bitmap_bh->b_data, VSFS_BLKSIZE, 0);
+		if (ino >= vsfs_max_bit(i + 1))
 			continue;
 		if (!test_and_set_bit_le(ino, bitmap_bh->b_data)) {
-			ino += sfs_max_bit(i) + SFS_ROOT_INO;
+			ino += vsfs_max_bit(i) + VSFS_ROOT_INO;
 			goto got;
 		}
 	}
@@ -622,8 +622,8 @@ got:
 		sync_dirty_buffer(bitmap_bh);
 	brelse(bitmap_bh);
 
-	if (ino < SFS_ROOT_INO || ino > SFS_GET_SB(blkcnt_inode) + SFS_ROOT_INO) {
-		sfs_msg(KERN_ERR, "sfs_new_inode", "rserved inode or inode > inodes count");
+	if (ino < VSFS_ROOT_INO || ino > VSFS_GET_SB(blkcnt_inode) + VSFS_ROOT_INO) {
+		vsfs_msg(KERN_ERR, "vsfs_new_inode", "rserved inode or inode > inodes count");
 		err = -EIO;
 		goto failed;
 	}
@@ -633,9 +633,9 @@ got:
 	inode->i_blocks = 0;
 	inode->i_generation = 0;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = current_time(inode);
-	si->i_flags = SFS_I(dir)->i_flags;
-	si->i_dir_start_lookup = 0;
-	memset(&si->i_data, 0, sizeof(si->i_data));
+	vsi->i_flags = VSFS_I(dir)->i_flags;
+	vsi->i_dir_start_lookup = 0;
+	memset(&vsi->i_data, 0, sizeof(vsi->i_data));
 	if (insert_inode_locked(inode) < 0) {
 		err = -EIO;
 		goto failed;
@@ -643,16 +643,16 @@ got:
 
 	mark_inode_dirty(inode);
 
-	bh = sb_bread(sb, sfs_inotoba(inode->i_ino));
+	bh = sb_bread(sb, vsfs_inotoba(inode->i_ino));
 	if (!bh) {
-		sfs_msg(KERN_ERR, "sfs_new_inode", "Failed to read inode %lu\n", inode->i_ino);
+		vsfs_msg(KERN_ERR, "vsfs_new_inode", "Failed to read inode %lu\n", inode->i_ino);
 		err = -EIO;
 		goto fail_remove_inode;
 	}
-	sfs_inode = (struct sfs_inode *)bh->b_data;
+	vsfs_inode = (struct vsfs_inode *)bh->b_data;
 	ktime_get_real_ts64(&ts);
-	sfs_inode->i_ctime = cpu_to_le64(ts.tv_sec);
-	sfs_inode->i_ctime_nsec = cpu_to_le32(ts.tv_nsec);
+	vsfs_inode->i_ctime = cpu_to_le64(ts.tv_sec);
+	vsfs_inode->i_ctime_nsec = cpu_to_le32(ts.tv_nsec);
 	mark_buffer_dirty(bh);
 	unlock_buffer(bh);
 //	if (sb->s_flags & SB_SYNCHRONOUS)
@@ -672,30 +672,32 @@ failed:
 	return ERR_PTR(err);
 }
 
-int sfs_setattr(struct dentry *dentry, struct iattr *attr)
+int vsfs_setattr(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = d_inode(dentry);
 	unsigned int ia_valid = attr->ia_valid;
-	int error;
+	int err;
 
-	error = setattr_prepare(dentry, attr);
-	if (error)
-		return error;
+	err= setattr_prepare(dentry, attr);
+	if (err)
+		return err;
 
 	if (ia_valid & ATTR_SIZE && attr->ia_size != inode->i_size) {
-		
+		//err = sfs_truncate(inode, attr->ia_size);
+		if (err)
+			return err;
 	}
 
 	setattr_copy(inode, attr);
 	mark_inode_dirty(inode);
-	return error;
+	return err;
 }
 
-const struct inode_operations sfs_file_inode_operations = {
-		.setattr = sfs_setattr,
+const struct inode_operations vsfs_file_inode_operations = {
+		.setattr = vsfs_setattr,
 };
 
-const struct file_operations sfs_file_operations = {
+const struct file_operations vsfs_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read_iter	= generic_file_read_iter,
 	.write_iter	= generic_file_write_iter,

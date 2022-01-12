@@ -1,22 +1,22 @@
 /*
- * sfs_fs.h
+ * vvsfs_fs.h
  *
  * Copyright 2021 Lee JeYeon., Dankook Univ.
  *		2reenact@gmail.com
  *
  */
 
-#ifndef _SFS_FS_H
-#define _SFS_FS_H
+#ifndef _VSFS_FS_H
+#define _VSFS_FS_H
 
 /* these are defined in kernel */
 #ifndef PAGE_SIZE
 #define PAGE_SIZE		4096
 #endif
 #define BITS_PER_BYTE		8
-#define SFS_SUPER_MAGIC		0x202112F5	/* SFS Magic Number */
+#define VSFS_SUPER_MAGIC	0x202105F5	/* VSFS Magic Number */
 
-struct sfs_configuration {
+struct vsfs_configuration {
 	int heap;
 	int dbg_lv;
 	int trim;
@@ -64,14 +64,14 @@ struct sfs_configuration {
 				t;					\
 			})
 
-#define SFS_SUPER_OFFSET		1024	/* byte-size offset */
-#define SFS_BLKSIZE			4096	/* support only 4KB block */
-#define SFS_BLKSHIFT			12	/* support only 4KB block */
+#define VSFS_SUPER_OFFSET		1024	/* byte-size offset */
+#define VSFS_BLKSIZE			4096	/* support only 4KB block */
+#define VSFS_BLKSHIFT			12	/* support only 4KB block */
 #define MAX_PATH_LEN			32
 
-#define SFS_ROOT_INO		 3	/* Root inode */
+#define VSFS_ROOT_INO			 3	/* Root inode */
 
-struct sfs_super_block {
+struct vsfs_super_block {
         __le32 magic;                   /* Magic Number */
         __le32 sector_size;		/* sector size in bytes */
         __le32 sectors_per_block;       /* # of sectors per block */
@@ -90,17 +90,17 @@ struct sfs_super_block {
 	char path[MAX_PATH_LEN];
 } __attribute__((packed));
 
-#define SFS_DIR_BLK_CNT		12      /* Address Pointers in Inode */
-#define SFS_IND_BLK_CNT		3       /* Indirect Pointers in Inode */
-#define SFS_NODE_PER_BLK	1024    /* Address Pointers in a Indirect Block */
-#define SFS_NODE_PER_BLK_BIT	10
-#define SFS_IND_BLK		SFS_DIR_BLK_CNT + 0
-#define SFS_DIND_BLK		SFS_DIR_BLK_CNT + 1
-#define SFS_TIND_BLK		SFS_DIR_BLK_CNT + 2
+#define VSFS_DIR_BLK_CNT		12      /* Address Pointers in Inode */
+#define VSFS_IND_BLK_CNT		3       /* Indirect Pointers in Inode */
+#define VSFS_NODE_PER_BLK		1024    /* Address Pointers in an Indirect Block */
+#define VSFS_NODE_PER_BLK_BIT		10
+#define VSFS_IND_BLK			VSFS_DIR_BLK_CNT + 0
+#define VSFS_DIND_BLK			VSFS_DIR_BLK_CNT + 1
+#define VSFS_TIND_BLK			VSFS_DIR_BLK_CNT + 2
 
-#define SFS_MAXNAME_LEN		255
+#define VSFS_MAXNAME_LEN		255
 
-struct sfs_inode {
+struct vsfs_inode {
         __le16 i_mode;                  /* file mode */
         __u8 i_advise;                  /* file hints */
         __u8 i_inline;                  /* file inline flags */
@@ -118,27 +118,27 @@ struct sfs_inode {
         __le32 i_flags;                 /* file attributes */
         __le32 i_pino;                  /* parent inode number */
 
-        __le32 i_daddr[SFS_DIR_BLK_CNT];     /* Pointers to data blocks */
-        __le32 i_iaddr[SFS_IND_BLK_CNT];      /* indirect, double indirect,
+        __le32 i_daddr[VSFS_DIR_BLK_CNT];     /* Pointers to data blocks */
+        __le32 i_iaddr[VSFS_IND_BLK_CNT];      /* indirect, double indirect,
                                                 triple_indirect block address*/
 } __attribute__((packed));
 
 struct indirect_node {
-        __le32 addr[SFS_NODE_PER_BLK];       /* array of data block address */
+        __le32 addr[VSFS_NODE_PER_BLK];       /* array of data block address */
 } __attribute__((packed));
 
 
-struct sfs_dir_entry {
+struct vsfs_dir_entry {
         __le32 inode;			/* inode number */
 	__le16 rec_len;
 	__u8 name_len;
 	__u8 file_type;
-        __u8 name[SFS_MAXNAME_LEN];	 /* file name */
+        __u8 name[VSFS_MAXNAME_LEN];	 /* file name */
 } __attribute__((packed));
 
-#define SFS_DIR_PAD			4
-#define SFS_DIR_ROUND			(SFS_DIR_PAD - 1)
-#define SFS_DIR_REC_LEN(name_len)	(((name_len) + 8 + SFS_DIR_ROUND) & ~SFS_DIR_ROUND)
+#define VSFS_DIR_PAD			4
+#define VSFS_DIR_ROUND			(VSFS_DIR_PAD - 1)
+#define VSFS_DIR_REC_LEN(name_len)	(((name_len) + 8 + VSFS_DIR_ROUND) & ~VSFS_DIR_ROUND)
 
-#endif /* _SFS_FS_H */
+#endif /* _VSFS_FS_H */
 

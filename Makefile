@@ -1,4 +1,4 @@
-NAME	= sfs
+NAME	= vsfs
 KDIR	= /lib/modules/$(shell uname -r)/build
 PWD	= $(shell pwd)
 
