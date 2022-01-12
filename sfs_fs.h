@@ -14,7 +14,7 @@
 #define PAGE_SIZE		4096
 #endif
 #define BITS_PER_BYTE		8
-#define SFS_SUPER_MAGIC		0x202005F5	/* SFS Magic Number */
+#define SFS_SUPER_MAGIC		0x202112F5	/* SFS Magic Number */
 
 struct sfs_configuration {
 	int heap;
@@ -66,6 +66,7 @@ struct sfs_configuration {
 
 #define SFS_SUPER_OFFSET		1024	/* byte-size offset */
 #define SFS_BLKSIZE			4096	/* support only 4KB block */
+#define SFS_BLKSHIFT			12	/* support only 4KB block */
 #define MAX_PATH_LEN			32
 
 #define SFS_ROOT_INO		 3	/* Root inode */

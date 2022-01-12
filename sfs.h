@@ -53,4 +53,30 @@ static inline struct sfs_sb_info *SFS_SB(struct super_block *sb)
 	return sb->s_fs_info;
 }
 
+/* super.c */
+extern void sfs_msg(const char *, const char *, const char *, ...);
+
+/* inode.c */
+extern struct inode *sfs_iget(struct super_block *, unsigned long);
+extern int sfs_write_inode(struct inode *, struct writeback_control *);
+extern void sfs_evict_inode(struct inode *);
+extern int sfs_prepare_chunk(struct page *, loff_t, unsigned);
+extern struct inode *sfs_new_inode(struct inode *, umode_t);
+extern int sfs_setattr(struct dentry *, struct iattr *);
+extern const struct inode_operations sfs_file_inode_operations;
+extern const struct file_operations sfs_file_operations;
+extern const struct address_space_operations sfs_aops;
+
+/* dir.c */
+extern int sfs_add_link(struct dentry *, struct inode *);
+extern ino_t sfs_inode_by_name(struct inode *, const struct qstr *);
+extern int sfs_make_empty(struct inode *, struct inode *);
+extern struct sfs_dir_entry *sfs_find_entry(struct inode *, const struct qstr *, struct page **);
+extern int sfs_delete_entry(struct inode *, struct sfs_dir_entry *, struct page *);
+extern int sfs_empty_dir(struct inode *);
+extern const struct file_operations sfs_dir_operations;
+
+/* namei.c */
+extern const struct inode_operations sfs_dir_inode_operations;
+
 #endif /* _SFS_H */

@@ -40,7 +40,7 @@ static void mkfs_usage(void) {
 }
 
 static void sfs_show_info(void) {
-        MSG(0, "\n\tSFS-tools: mkfs.sfs Ver: %d (%d)\n\n",
+        MSG(0, "\n\tSFS-tools: mkfs.sfs Ver: %d(%d)\n\n",
                                 SFS_TOOLS_VERSION,
                                 SFS_TOOLS_DATE);
 
@@ -52,7 +52,7 @@ static void sfs_show_info(void) {
 	if (strlen(c.vol_label))
 		MSG(0, "Info: Lable = %s\n", c.vol_label);
 
-	MSG(0, "Info: Trim is %s\n", c.trim ? "enalbe": "disable");
+//	MSG(0, "Info: Trim is %s\n", c.trim ? "enalbe": "disable");
 }
 
 /*

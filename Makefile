@@ -4,7 +4,7 @@ PWD	= $(shell pwd)
 
 obj-m		+= $(NAME).o
 
-$(NAME)-y	:= super.o
+$(NAME)-y	:= super.o inode.o dir.o namei.o
 
 all:
 	make -C $(KDIR) M=$(PWD) modules

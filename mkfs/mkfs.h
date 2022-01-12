@@ -13,8 +13,8 @@
 
 #include "sfs_fs.h"
 
-#define SFS_TOOLS_VERSION	20201
-#define SFS_TOOLS_DATE		8
+#define SFS_TOOLS_VERSION	2021
+#define SFS_TOOLS_DATE		1217
 
 struct sfs_configuration c;
 
